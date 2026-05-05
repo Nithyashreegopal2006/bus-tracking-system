@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TrackMyBus – Real-Time Bus Tracking</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ── RESET ── */
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:#fff;color:#222;overflow-x:hidden}
+html,body{height:100%}
+
+/* ── PAGE SYSTEM ── */
+.page{display:none;min-height:100vh;flex-direction:column}
+.page.active{display:flex}
+.pg-scroll{overflow-y:auto;overflow-x:hidden}
+
+/* ── NAV ── */
+.topnav{display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:60px;background:#fff;border-bottom:1px solid #f0f0f0;position:sticky;top:0;z-index:900;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0}
+.nav-left{display:flex;align-items:center;gap:0}
+.brand{display:flex;align-items:center;gap:8px;cursor:pointer}
+.brand-icon{width:36px;height:36px;background:#e2391b;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.brand-name{font-size:1.2rem;font-weight:800;color:#e2391b;letter-spacing:-.02em}
+.nav-tabs{display:flex;margin-left:1.5rem}
+.ntab{padding:0 1.1rem;height:60px;display:flex;align-items:center;gap:6px;font-size:.84rem;font-weight:500;color:#666;cursor:pointer;border-bottom:2.5px solid transparent;transition:all .2s;white-space:nowrap}
+.ntab:hover{color:#e2391b}
+.ntab.on{color:#e2391b;border-bottom-color:#e2391b;font-weight:600}
+.nav-right{display:flex;align-items:center;gap:.6rem}
+/* Language selector */
+.lang-wrap{position:relative}
+.lang-btn{display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid #e8e8e8;border-radius:8px;background:#fff;font-size:.82rem;font-weight:600;color:#444;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s}
+.lang-btn:hover{border-color:#e2391b;color:#e2391b}
+.lang-menu{position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid #f0f0f0;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.12);width:180px;padding:.4rem;z-index:999;display:none}
+.lang-menu.open{display:block;animation:menuPop .18s ease}
+@keyframes menuPop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.lang-menu-hd{font-size:.63rem;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.08em;padding:.3rem .6rem .15rem}
+.lang-opt{display:flex;align-items:center;gap:.6rem;padding:.5rem .6rem;border-radius:8px;cursor:pointer;font-size:.84rem;font-weight:500;color:#444;transition:all .18s}
+.lang-opt:hover{background:#fff5f4;color:#e2391b}
+.lang-opt.active{background:#fff5f4;color:#e2391b;font-weight:700}
+.lang-chk{margin-left:auto;font-size:.72rem;color:#e2391b}
+/* Help link */
+.help-link{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;font-size:.84rem;font-weight:500;color:#555;cursor:pointer;transition:all .2s}
+.help-link:hover{background:#fff5f4;color:#e2391b}
+/* Admin btn */
+.btn-admin{padding:8px 20px;border-radius:8px;border:1.5px solid #e2391b;background:transparent;color:#e2391b;font-size:.84rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all .22s}
+.btn-admin:hover{background:#e2391b;color:#fff}
+
+/* ── HELP MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.42);z-index:2000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.modal-bg.open{display:flex;animation:fadein .2s}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.modal-box{background:#fff;border-radius:20px;width:90%;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,.18);overflow:hidden;animation:modalup .25s cubic-bezier(.22,1,.36,1)}
+@keyframes modalup{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.3rem;border-bottom:1px solid #f0f0f0}
+.modal-title{font-size:1rem;font-weight:800;color:#222}
+.modal-close{width:30px;height:30px;border-radius:50%;border:none;background:#f5f5f5;color:#888;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.modal-close:hover{background:#fee2e2;color:#e2391b}
+.modal-body{padding:1.2rem 1.3rem}
+.help-step{display:flex;gap:.8rem;margin-bottom:.9rem}
+.hstep-n{width:28px;height:28px;border-radius:50%;background:#e2391b;color:#fff;font-size:.8rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hstep-t{font-size:.88rem;font-weight:700;color:#222;margin-bottom:.15rem}
+.hstep-d{font-size:.78rem;color:#777;line-height:1.5}
+.help-contact{background:#fafafa;border-radius:10px;padding:.9rem 1rem;margin-top:.6rem}
+.hc-title{font-size:.82rem;font-weight:700;color:#333;margin-bottom:.55rem}
+.hc-row{display:flex;align-items:center;gap:.6rem;font-size:.8rem;color:#555;margin-bottom:.35rem}
+
+/* ── HERO ── */
+.hero{position:relative;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 30%,#3d2b6b 65%,#b08fcc 100%);overflow:hidden;min-height:320px;display:flex;align-items:flex-end}
+.hero-sky{position:absolute;inset:0}
+.sky-orb{position:absolute;border-radius:50%;opacity:.3}
+.orb1{width:500px;height:280px;background:radial-gradient(ellipse,#6b4fa0,transparent);top:-80px;right:80px}
+.orb2{width:700px;height:350px;background:radial-gradient(ellipse,#4a3080,transparent);top:-120px;left:-100px;opacity:.2}
+.mt1{position:absolute;bottom:0;left:0;right:0;height:160px;background:linear-gradient(to top,#2d6a4f,#40916c);clip-path:polygon(0 100%,0 60%,8% 35%,18% 55%,30% 20%,42% 50%,55% 15%,68% 45%,80% 25%,92% 48%,100% 30%,100% 100%)}
+.mt2{position:absolute;bottom:0;left:0;right:0;height:120px;background:linear-gradient(to top,#1b4332,#2d6a4f);clip-path:polygon(0 100%,0 75%,12% 50%,25% 70%,38% 40%,50% 65%,62% 35%,75% 55%,88% 42%,100% 58%,100% 100%)}
+.hero-road{position:absolute;bottom:0;left:0;right:0;height:72px}
+.road-base{position:absolute;bottom:0;left:0;right:0;height:50px;background:linear-gradient(to bottom,#2c2c2c,#1a1a1a)}
+.road-dashes{position:absolute;top:50%;left:0;right:0;display:flex;gap:28px;transform:translateY(-50%);overflow:hidden}
+.rd{height:3px;width:48px;background:rgba(255,255,255,.35);border-radius:2px;flex-shrink:0;animation:rdmove 1.4s linear infinite}
+@keyframes rdmove{0%{transform:translateX(0)}100%{transform:translateX(-76px)}}
+.hero-bus{position:absolute;bottom:50px;animation:busmove 11s linear infinite}
+@keyframes busmove{from{left:-180px}to{left:calc(100% + 180px)}}
+.hero-content{position:relative;z-index:10;padding:2.5rem 2rem 1.4rem;max-width:560px}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:100px;background:rgba(255,255,255,.14);font-size:.74rem;color:rgba(255,255,255,.9);margin-bottom:.7rem;backdrop-filter:blur(8px)}
+.hero-bdot{width:6px;height:6px;border-radius:50%;background:#4ade80;animation:blink 1.5s infinite;flex-shrink:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hero-title{font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:800;color:#fff;line-height:1.12;text-shadow:0 2px 8px rgba(0,0,0,.3)}
+
+/* ── SEARCH BOX ── */
+.search-outer{background:#fff;padding:0 2rem}
+.search-box{background:#fff;border-radius:14px;box-shadow:0 4px 24px rgba(0,0,0,.11);padding:1.2rem 1.4rem 1.4rem;margin-top:-1px;position:relative;z-index:50}
+.search-row{display:flex;border:1.5px solid #e8e8e8;border-radius:10px;overflow:hidden}
+.sf{flex:1;display:flex;align-items:center;gap:10px;padding:13px 16px;border-right:1.5px solid #e8e8e8;transition:background .2s;min-width:0}
+.sf:hover{background:#fafafa}
+.sf:last-of-type,.sf-date{border-right:none}
+.sf-date{display:flex;align-items:center;gap:10px;padding:13px 16px;border-left:1.5px solid #e8e8e8;flex-shrink:0}
+.sf-ico{font-size:17px;color:#bbb;flex-shrink:0}
+.sf-inner{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sf-lbl{font-size:.65rem;color:#bbb;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.sf-inp{font-size:.9rem;font-weight:500;color:#333;border:none;outline:none;background:transparent;font-family:'Inter',sans-serif;width:100%}
+.sf-inp::placeholder{color:#ccc;font-weight:400}
+.sf-val{font-size:.88rem;font-weight:600;color:#333}
+.date-chip{padding:4px 12px;border-radius:100px;border:1.5px solid #e2391b;background:transparent;font-size:.73rem;font-weight:600;color:#e2391b;font-family:'Inter',sans-serif;cursor:default}
+.btn-track{width:100%;margin-top:1rem;padding:13px;background:#e2391b;color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:8px;animation:trackpulse 3s ease-in-out infinite}
+.btn-track:hover{background:#c62f15;transform:translateY(-1px);box-shadow:0 4px 18px rgba(226,57,27,.3);animation:none}
+@keyframes trackpulse{0%,100%{box-shadow:0 4px 16px rgba(226,57,27,.2)}50%{box-shadow:0 4px 24px rgba(226,57,27,.45)}}
+
+/* ── SECTIONS ── */
+.sec{padding:2.5rem 2rem}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.1rem}
+.sec-title{font-size:1.2rem;font-weight:700;color:#222}
+.sec-sub{font-size:.82rem;color:#999;margin-top:.15rem}
+.sec-link{font-size:.84rem;color:#e2391b;font-weight:600;cursor:pointer}
+.sec-link:hover{text-decoration:underline}
+.divider{height:1px;background:#f2f2f2;margin:0 2rem}
+
+/* ── OFFER CARDS ── */
+.offer-row{display:flex;gap:.9rem;overflow-x:auto;padding-bottom:.4rem}
+.offer-row::-webkit-scrollbar{height:3px}
+.offer-row::-webkit-scrollbar-thumb{background:#eee;border-radius:2px}
+.ocard{flex-shrink:0;width:200px;border:1.5px solid #f0f0f0;border-radius:12px;overflow:hidden;cursor:pointer;transition:all .25s}
+.ocard:hover{box-shadow:0 6px 20px rgba(0,0,0,.1);transform:translateY(-3px);border-color:#fad7d2}
+.ocard-img{height:90px;display:flex;align-items:center;justify-content:center;font-size:2.2rem}
+.ocard-body{padding:.75rem .9rem}
+.ocard-title{font-size:.84rem;font-weight:700;color:#222}
+.ocard-sub{font-size:.72rem;color:#999;margin-top:2px}
+
+/* ── WHY SECTION ── */
+.why{background:#fafafa;padding:2.5rem 2rem}
+.why-title{font-size:1.2rem;font-weight:700;color:#222;margin-bottom:.2rem}
+.why-sub{font-size:.82rem;color:#999;margin-bottom:1.5rem}
+.feat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem}
+.fitem{display:flex;gap:.8rem;padding:.9rem 1rem;background:#fff;border:1.5px solid #f0f0f0;border-radius:10px;transition:all .22s}
+.fitem:hover{border-color:#fad7d2;box-shadow:0 4px 14px rgba(226,57,27,.07);transform:translateY(-2px)}
+.fitem-ico{width:38px;height:38px;border-radius:9px;background:#fff5f4;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.fitem-t{font-size:.86rem;font-weight:700;color:#222;margin-bottom:.15rem}
+.fitem-d{font-size:.76rem;color:#888;line-height:1.5}
+
+/* ── ROUTES GRID ── */
+.route-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:.6rem}
+.rchip{display:flex;align-items:center;justify-content:space-between;padding:.65rem .9rem;border:1.5px solid #f0f0f0;border-radius:8px;cursor:pointer;font-size:.82rem;color:#444;font-weight:500;transition:all .2s}
+.rchip:hover{border-color:#e2391b;color:#e2391b;background:#fff5f4}
+.rchip-arr{color:#ccc;font-size:.72rem;transition:color .2s}
+.rchip:hover .rchip-arr{color:#e2391b}
+
+/* ── FAQ ── */
+.faq-sec{padding:2.5rem 2rem}
+.faq-tabs{display:flex;border-bottom:2px solid #f0f0f0;margin-bottom:1.3rem}
+.ftab{padding:.65rem 1.2rem;font-size:.84rem;font-weight:500;color:#777;cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-2px;transition:all .2s}
+.ftab:hover{color:#e2391b}
+.ftab.on{color:#e2391b;border-bottom-color:#e2391b;font-weight:700}
+.faq-list{display:flex;flex-direction:column}
+.faq-item{border-bottom:1px solid #f5f5f5}
+.faq-q{display:flex;align-items:center;justify-content:space-between;padding:1rem 0;font-size:.88rem;font-weight:500;color:#222;cursor:pointer;gap:1rem;transition:color .2s}
+.faq-q:hover{color:#e2391b}
+.faq-chev{color:#bbb;font-size:.72rem;transition:transform .3s;flex-shrink:0}
+.faq-chev.open{transform:rotate(180deg);color:#e2391b}
+.faq-a{display:none;padding:0 0 .9rem;font-size:.82rem;color:#666;line-height:1.7}
+.faq-a.open{display:block}
+
+/* ── FOOTER ── */
+.footer{background:#f8f8f8;border-top:1px solid #eee;padding:2rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1.5rem}
+.fg-title{font-size:.75rem;font-weight:700;color:#333;margin-bottom:.65rem;text-transform:uppercase;letter-spacing:.05em}
+.fg-link{display:block;font-size:.78rem;color:#888;margin-bottom:.38rem;cursor:pointer;transition:color .2s}
+.fg-link:hover{color:#e2391b}
+.footer-btm{background:#efefef;padding:.9rem 2rem;display:flex;align-items:center;justify-content:space-between;font-size:.74rem;color:#999}
+.footer-brand{font-weight:700;color:#e2391b}
+
+/* ── TRACK PAGE ── */
+#pg-track{background:#f5f5f5;height:100vh}
+.track-nav-bar{display:flex;align-items:center;justify-content:space-between;padding:0 1.8rem;height:58px;background:#fff;border-bottom:1px solid #f0f0f0;box-shadow:0 1px 4px rgba(0,0,0,.05);flex-shrink:0}
+.track-left{display:flex;align-items:center;gap:1rem}
+.live-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:100px;font-size:.73rem;font-weight:700;color:#16a34a}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#16a34a;animation:blink 1.5s infinite;flex-shrink:0}
+.track-right{display:flex;align-items:center;gap:.4rem}
+.tnpill{padding:6px 16px;border-radius:8px;border:1.5px solid #e8e8e8;background:#fff;font-size:.81rem;font-weight:500;color:#555;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s;white-space:nowrap}
+.tnpill:hover{border-color:#e2391b;color:#e2391b}
+.tnpill.red{background:#e2391b;color:#fff;border-color:#e2391b;font-weight:600}
+.tnpill.red:hover{background:#c62f15}
+.track-body{display:flex;flex:1;overflow:hidden;min-height:0}
+
+/* Sidebar */
+.sidebar{width:292px;flex-shrink:0;background:#fff;border-right:1px solid #eee;overflow-y:auto;display:flex;flex-direction:column}
+.sidebar::-webkit-scrollbar{width:3px}
+.sidebar::-webkit-scrollbar-thumb{background:#eee}
+.sb-head{padding:1rem 1.1rem;border-bottom:1px solid #f5f5f5}
+.sb-title{font-size:.9rem;font-weight:700;color:#222}
+.sb-sub{font-size:.71rem;color:#bbb;margin-top:2px}
+.sb-body{padding:.85rem .95rem;flex:1;display:flex;flex-direction:column;gap:.8rem}
+.ctrl-g{display:flex;flex-direction:column;gap:.32rem}
+.ctrl-lbl{font-size:.65rem;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.08em}
+.ctrl-sel{width:100%;padding:9px 11px;border:1.5px solid #eee;border-radius:8px;font-size:.83rem;font-family:'Inter',sans-serif;color:#333;background:#fff;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23bbb'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;padding-right:26px;transition:border-color .2s}
+.ctrl-sel:focus{border-color:#e2391b}
+.ctrl-sel option{background:#fff}
+.bcnt-row{display:flex;align-items:center;justify-content:space-between}
+.bcnt-badge{padding:2px 8px;background:#fff5f4;border:1px solid #fad7d2;border-radius:10px;font-size:.65rem;font-weight:700;color:#e2391b}
+.bus-cards{display:flex;flex-direction:column;gap:.4rem}
+.bcard{border:1.5px solid #f0f0f0;border-radius:8px;padding:.7rem .85rem;cursor:pointer;transition:all .2s;background:#fff;border-left:3px solid #f0f0f0}
+.bcard:hover{border-color:#e2391b;box-shadow:0 2px 8px rgba(226,57,27,.09)}
+.bcard.moving{border-left-color:#16a34a}
+.bcard.stopped{border-left-color:#d97706}
+.bc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.38rem}
+.bc-plate{font-size:.82rem;font-weight:700;color:#222}
+.bc-tag{padding:2px 7px;border-radius:10px;font-size:.61rem;font-weight:700}
+.bc-tag.moving{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+.bc-tag.stopped{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
+.bc-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem}
+.bm-v{font-size:.75rem;font-weight:600;color:#333}
+.bm-l{font-size:.59rem;color:#bbb}
+.crowd-pill{padding:1px 6px;border-radius:9px;font-size:.61rem;font-weight:700}
+.cLow{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+.cMedium{background:#fffbeb;color:#d97706;border:1px solid #fde68a}
+.cHigh{background:#fff1f2;color:#e11d48;border:1px solid #fecdd3}
+
+/* Map */
+.map-wrap{flex:1;position:relative;min-width:0}
+#map{width:100%;height:100%}
+/* Status badges – top-right, clear of zoom buttons */
+.map-status{position:absolute;top:14px;right:14px;z-index:400;display:flex;flex-direction:column;gap:.4rem}
+.map-badge{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;background:rgba(255,255,255,.97);border:1px solid #eee;border-radius:100px;font-size:.76rem;font-weight:700;color:#333;box-shadow:0 2px 10px rgba(0,0,0,.12);white-space:nowrap}
+.mbdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+/* Map loader */
+.map-loader{position:absolute;inset:0;background:#f5f5f5;z-index:998;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.8rem;transition:opacity .5s}
+.map-loader.gone{opacity:0;pointer-events:none}
+.spin{width:36px;height:36px;border:3px solid #eee;border-top-color:#e2391b;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Leaflet popup */
+.leaflet-popup-content-wrapper{background:#fff!important;border:1px solid #eee!important;border-radius:12px!important;box-shadow:0 8px 28px rgba(0,0,0,.14)!important;padding:0!important}
+.leaflet-popup-content{margin:0!important;width:255px!important}
+.leaflet-popup-tip{background:#fff!important}
+.leaflet-popup-close-button{color:#bbb!important;right:8px!important;top:8px!important;font-size:15px!important}
+.pw{padding:.9rem 1rem}
+.pw-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:.65rem;border-bottom:1px solid #f5f5f5;margin-bottom:.65rem}
+.pw-id{font-size:.94rem;font-weight:800;color:#222;display:flex;align-items:center;gap:7px}
+.pw-st{padding:3px 9px;border-radius:100px;font-size:.65rem;font-weight:700}
+.pw-grid{display:grid;grid-template-columns:1fr 1fr;gap:.38rem}
+.pw-cell{background:#fafafa;border-radius:8px;padding:.48rem .6rem}
+.pw-k{font-size:.58rem;color:#bbb;text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:2px}
+.pw-v{font-size:.79rem;font-weight:600;color:#333}
+
+/* ── LOGIN PAGE ── */
+#pg-admin-login{background:#fff;overflow:auto}
+.login-bg{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+.lbg-c{position:absolute;border-radius:50%;filter:blur(80px);opacity:.5;animation:lcfloat 9s ease-in-out infinite}
+.lbg-c1{width:480px;height:480px;background:radial-gradient(circle,rgba(226,57,27,.12),transparent 70%);top:-160px;left:-100px}
+.lbg-c2{width:380px;height:380px;background:radial-gradient(circle,rgba(251,191,36,.1),transparent 70%);bottom:-80px;right:-80px;animation-delay:-4s}
+.lbg-c3{width:280px;height:280px;background:radial-gradient(circle,rgba(37,99,235,.08),transparent 70%);top:35%;right:28%;animation-delay:-6s}
+@keyframes lcfloat{0%,100%{transform:translate(0,0)}33%{transform:translate(22px,-26px)}66%{transform:translate(-16px,18px)}}
+.lbg-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(226,57,27,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(226,57,27,.03) 1px,transparent 1px);background-size:46px 46px}
+.login-topbar{position:relative;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:60px;border-bottom:1px solid #f5f5f5}
+.login-center{position:relative;z-index:10;display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 60px);padding:2rem}
+/* Split card */
+.lcard{display:flex;border-radius:22px;overflow:hidden;box-shadow:0 20px 70px rgba(0,0,0,.1);width:100%;max-width:800px;background:#fff;animation:lcardin .5s cubic-bezier(.22,1,.36,1)}
+@keyframes lcardin{from{opacity:0;transform:translateY(24px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+/* Left panel */
+.lcard-l{background:linear-gradient(145deg,#e2391b 0%,#c62f15 55%,#991f0e 100%);padding:2.5rem 2rem;width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:.7rem;position:relative;overflow:hidden}
+.lcard-l::before{content:'';position:absolute;top:-50px;right:-50px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.07)}
+.lcard-l::after{content:'';position:absolute;bottom:-35px;left:-35px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.05)}
+.ll-icon{font-size:2.6rem;filter:drop-shadow(0 4px 10px rgba(0,0,0,.25));margin-bottom:.2rem}
+.ll-title{font-size:1.45rem;font-weight:800;color:#fff;letter-spacing:-.02em}
+.ll-sub{font-size:.81rem;color:rgba(255,255,255,.72);line-height:1.6}
+.ll-feats{display:flex;flex-direction:column;gap:.5rem;margin-top:.4rem}
+.llf{display:flex;align-items:center;gap:.55rem;font-size:.79rem;color:rgba(255,255,255,.82);font-weight:500}
+.llf-dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.6);flex-shrink:0}
+/* Mini road in left panel */
+.ll-road{position:absolute;bottom:0;left:0;right:0;height:42px;background:rgba(0,0,0,.18);overflow:hidden;border-top:1px solid rgba(255,255,255,.1)}
+.ll-road-line{position:absolute;top:50%;left:0;right:0;border-top:2px dashed rgba(255,255,255,.18);transform:translateY(-50%)}
+.ll-bus{position:absolute;bottom:5px;font-size:1.4rem;animation:lbus 5s linear infinite}
+@keyframes lbus{from{left:-50px}to{left:calc(100% + 50px)}}
+/* Right panel */
+.lcard-r{flex:1;padding:2.6rem 2.3rem;display:flex;align-items:center;justify-content:center}
+.lr-inner{width:100%;max-width:320px}
+.lr-badge{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;font-weight:700;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:100px;padding:4px 11px;margin-bottom:1.3rem;text-transform:uppercase;letter-spacing:.06em}
+.lr-badge-dot{width:5px;height:5px;border-radius:50%;background:#16a34a;animation:blink 1.5s infinite;flex-shrink:0}
+.lr-title{font-size:1.7rem;font-weight:800;color:#111;letter-spacing:-.03em;margin-bottom:.25rem}
+.lr-sub{font-size:.83rem;color:#bbb;margin-bottom:1.7rem}
+.lf-grp{margin-bottom:1rem}
+.lf-lbl{display:block;font-size:.7rem;font-weight:700;color:#555;margin-bottom:.4rem;letter-spacing:.04em;text-transform:uppercase}
+.lf-wrap{position:relative;display:flex;align-items:center}
+.lf-ico{position:absolute;left:12px;font-size:14px;opacity:.45;pointer-events:none}
+.lf-inp{width:100%;padding:12px 12px 12px 38px;border:2px solid #eee;border-radius:11px;font-size:.9rem;font-family:'Inter',sans-serif;color:#222;outline:none;transition:all .22s;background:#fafafa}
+.lf-inp:focus{border-color:#e2391b;background:#fff;box-shadow:0 0 0 3px rgba(226,57,27,.07)}
+.lf-inp::placeholder{color:#ccc}
+.lf-eye{position:absolute;right:12px;cursor:pointer;font-size:14px;opacity:.38;transition:opacity .2s}
+.lf-eye:hover{opacity:.7}
+.lerr{display:none;font-size:.77rem;color:#e2391b;padding:.55rem .85rem;background:#fff1f2;border:1px solid #fecdd3;border-radius:9px;margin-bottom:.9rem;animation:shk .3s ease}
+@keyframes shk{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.lbtn{width:100%;padding:13px;border-radius:11px;border:none;background:linear-gradient(135deg,#e2391b,#c62f15);color:#fff;font-size:.94rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 4px 18px rgba(226,57,27,.28);margin-bottom:1.3rem;position:relative;overflow:hidden}
+.lbtn:hover{transform:translateY(-2px);box-shadow:0 8px 26px rgba(226,57,27,.38)}
+.lbtn:active{transform:translateY(0)}
+.lbtn-arr{transition:transform .2s}
+.lbtn:hover .lbtn-arr{transform:translateX(4px)}
+.lbtn-ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.22);transform:scale(0);pointer-events:none}
+.demo-row{display:flex;align-items:center;justify-content:center;gap:.45rem;flex-wrap:wrap}
+.demo-lbl{font-size:.71rem;color:#ccc}
+.demo-chips{display:flex;align-items:center;gap:.35rem}
+.demo-chip{font-size:.71rem;background:#f5f5f5;color:#777;padding:3px 9px;border-radius:6px;cursor:pointer;font-weight:600;border:1px solid transparent;font-family:'Inter',sans-serif;transition:all .18s}
+.demo-chip:hover{background:#fff5f4;color:#e2391b;border-color:#fecdd3}
+
+/* ── DASHBOARD ── */
+#pg-dash{background:#f5f5f5;height:100vh}
+.dash-body{flex:1;overflow-y:auto;padding:1.4rem 1.8rem}
+.dash-body::-webkit-scrollbar{width:3px}
+.dash-body::-webkit-scrollbar-thumb{background:#ddd;border-radius:2px}
+.dsec-lbl{font-size:.74rem;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.07em;margin-bottom:.8rem;display:flex;align-items:center;gap:7px}
+.dsec-lbl::before{content:'';width:3px;height:.85em;border-radius:2px;background:#e2391b;display:block}
+/* Metric */
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(142px,1fr));gap:.75rem;margin-bottom:1.4rem}
+.mcard{background:#fff;border:1px solid #eee;border-radius:12px;padding:1rem 1.1rem;position:relative;overflow:hidden;transition:all .22s;cursor:default}
+.mcard:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);transform:translateY(-2px)}
+.mcard-bar{position:absolute;top:0;left:0;right:0;height:3px}
+.m-lbl{font-size:.65rem;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem}
+.m-val{font-size:1.85rem;font-weight:800;color:#222;line-height:1}
+.m-sub{font-size:.67rem;color:#ccc;margin-top:.2rem}
+.m-ico{position:absolute;right:11px;bottom:10px;font-size:1.35rem;opacity:.1}
+/* Insights */
+.irow{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1.4rem}
+.icard{background:#fff;border:1px solid #eee;border-radius:12px;padding:1rem;display:flex;align-items:center;gap:.8rem;transition:all .22s}
+.icard:hover{box-shadow:0 3px 12px rgba(0,0,0,.07);transform:translateY(-1px)}
+.i-ico{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.i-lbl{font-size:.69rem;color:#bbb;margin-bottom:2px}
+.i-val{font-size:1.5rem;font-weight:800;color:#222;line-height:1}
+/* Charts */
+.cgrid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-bottom:.75rem}
+.cgrid2{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem}
+.cgrid-gauge{display:grid;grid-template-columns:300px 1fr;gap:.75rem;margin-bottom:1.4rem}
+.ccard{background:#fff;border:1px solid #eee;border-radius:12px;padding:1rem 1.1rem}
+.c-title{font-size:.73rem;font-weight:700;color:#bbb;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.8rem}
+.cbox{position:relative;height:162px}
+.cbox-tall{position:relative;height:195px}
+/* Gauge */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center}
+.gauge-lbl{font-size:1.5rem;font-weight:800;color:#e2391b;margin-top:.3rem}
+.gauge-sub{font-size:.7rem;color:#bbb;margin-top:2px}
+/* Heatmap */
+.hm-wrap{overflow-x:auto;margin-top:.2rem}
+.hm-tbl{border-collapse:separate;border-spacing:2.5px}
+.hm-tbl th{padding:2px 3px;color:#bbb;font-weight:600;text-align:center;font-size:.6rem;white-space:nowrap}
+.hm-tbl td{width:24px;height:20px;border-radius:4px;text-align:center;font-size:.55rem;font-weight:700;cursor:default;color:#fff;transition:transform .15s}
+.hm-tbl td:hover{transform:scale(1.2);position:relative;z-index:5;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.hm-rlbl{color:#bbb;font-weight:600;white-space:nowrap;padding-right:3px;text-align:right;font-size:.6rem}
+/* Management */
+.mnav{display:flex;gap:.35rem;margin-bottom:.9rem;flex-wrap:wrap}
+.mbtn{padding:6px 15px;border-radius:100px;border:1.5px solid #eee;background:#fff;font-size:.78rem;font-weight:500;color:#777;cursor:pointer;font-family:'Inter',sans-serif;transition:all .2s}
+.mbtn:hover{border-color:#e2391b;color:#e2391b}
+.mbtn.on{border-color:#e2391b;color:#e2391b;background:#fff5f4;font-weight:700}
+.mpanel{display:none;background:#fff;border:1px solid #eee;border-radius:12px;padding:1rem 1.1rem}
+.mpanel.on{display:block}
+.mfrow{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem;align-items:flex-end}
+.minp{padding:8px 11px;border:1.5px solid #eee;border-radius:8px;font-size:.79rem;font-family:'Inter',sans-serif;color:#333;outline:none;transition:border-color .2s;min-width:88px;background:#fff}
+.minp:focus{border-color:#e2391b}
+.msel{padding:8px 11px;border:1.5px solid #eee;border-radius:8px;font-size:.79rem;font-family:'Inter',sans-serif;color:#333;outline:none;cursor:pointer;background:#fff}
+.msel option{background:#fff}
+.btnadd{padding:8px 17px;border:none;border-radius:8px;background:#e2391b;color:#fff;font-size:.79rem;cursor:pointer;font-family:'Inter',sans-serif;font-weight:700;white-space:nowrap;transition:all .2s}
+.btnadd:hover{background:#c62f15;transform:translateY(-1px)}
+.dtbl{width:100%;border-collapse:collapse;font-size:.78rem}
+.dtbl th{text-align:left;padding:7px 9px;border-bottom:1px solid #f0f0f0;color:#bbb;font-size:.63rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.dtbl td{padding:7px 9px;border-bottom:1px solid #f8f8f8;color:#666;vertical-align:middle}
+.dtbl tbody tr:last-child td{border-bottom:none}
+.dtbl tbody tr:hover td{background:#fafafa;color:#333}
+.btndel{padding:3px 9px;border:none;border-radius:6px;background:#fff1f2;color:#e11d48;font-size:.68rem;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;transition:all .2s}
+.btndel:hover{background:#fecdd3}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;padding:11px 18px;border-radius:11px;font-size:.83rem;z-index:9999;transform:translateY(50px);opacity:0;transition:all .32s cubic-bezier(.22,1,.36,1);max-width:280px;font-weight:500;box-shadow:0 4px 18px rgba(0,0,0,.1);pointer-events:none}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{background:#fff;border:1px solid #bbf7d0;color:#16a34a}
+.toast.err{background:#fff;border:1px solid #fecdd3;color:#e2391b}
+.toast.inf{background:#fff;border:1px solid #bfdbfe;color:#2563eb}
+
+/* i18n fade */
+[data-i18n]{transition:opacity .16s}
+.lang-fade{opacity:0!important}
+
+@media(max-width:680px){
+  .track-body{flex-direction:column}
+  .sidebar{width:100%;max-height:200px}
+  .lcard{flex-direction:column}
+  .lcard-l{width:100%;min-height:180px}
+  .cgrid3,.irow{grid-template-columns:1fr}
+  .cgrid2{grid-template-columns:1fr}
+  .cgrid-gauge{grid-template-columns:1fr}
+  .mgrid{grid-template-columns:1fr 1fr}
+  .search-row{flex-direction:column}
+  .sf,.sf-date{border-right:none;border-bottom:1.5px solid #e8e8e8}
+  .sf:last-of-type,.sf-date{border-bottom:none}
+  .sf-date{border-left:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ████████████ HOME PAGE ████████████ -->
+<div id="pg-home" class="page active pg-scroll">
+
+  <nav class="topnav">
+    <div class="nav-left">
+      <div class="brand" onclick="null">
+        <div class="brand-icon">🚌</div>
+        <div class="brand-name">TrackMyBus</div>
+      </div>
+      <div class="nav-tabs">
+        <div class="ntab on">🚌 Bus Tracking</div>
+        <div class="ntab" onclick="gotoTrack()">🗺️ Live Map</div>
+      </div>
+    </div>
+    <div class="nav-right">
+      <!-- Language Selector -->
+      <div class="lang-wrap" id="lang-wrap">
+        <button class="lang-btn" onclick="toggleLang()" id="lang-btn">
+          <span id="lang-flag">🌐</span><span id="lang-name">EN</span><span id="lang-chev" style="font-size:.6rem;color:#bbb;transition:transform .2s">▾</span>
+        </button>
+        <div class="lang-menu" id="lang-menu">
+          <div class="lang-menu-hd">Language</div>
+          <div class="lang-opt active" onclick="setLang('en')" data-l="en"><span>🇬🇧</span><span>English</span><span class="lang-chk">✓</span></div>
+          <div class="lang-opt" onclick="setLang('ta')" data-l="ta"><span>🇮🇳</span><span>தமிழ்</span><span class="lang-chk"></span></div>
+          <div class="lang-opt" onclick="setLang('hi')" data-l="hi"><span>🇮🇳</span><span>हिन्दी</span><span class="lang-chk"></span></div>
+          <div class="lang-opt" onclick="setLang('te')" data-l="te"><span>🇮🇳</span><span>తెలుగు</span><span class="lang-chk"></span></div>
+          <div class="lang-opt" onclick="setLang('kn')" data-l="kn"><span>🇮🇳</span><span>ಕನ್ನಡ</span><span class="lang-chk"></span></div>
+          <div class="lang-opt" onclick="setLang('ml')" data-l="ml"><span>🇮🇳</span><span>മലയാളം</span><span class="lang-chk"></span></div>
+        </div>
+      </div>
+      <div class="help-link" onclick="openHelp()"><span>❓</span><span data-i18n="help">Help</span></div>
+      <button class="btn-admin" onclick="showPg('pg-admin-login')" data-i18n="adminLogin">Admin Login</button>
+    </div>
+  </nav>
+
+  <!-- HELP MODAL -->
+  <div class="modal-bg" id="help-modal" onclick="closeHelp()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <div class="modal-title" data-i18n="helpTitle">❓ Help & Guide</div>
+        <button class="modal-close" onclick="closeHelp()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="help-step"><div class="hstep-n">1</div><div><div class="hstep-t" data-i18n="h1t">Select Your City</div><div class="hstep-d" data-i18n="h1d">Choose Salem, Erode, Tiruppur or Namakkal from the search box or the Live Map page.</div></div></div>
+        <div class="help-step"><div class="hstep-n">2</div><div><div class="hstep-t" data-i18n="h2t">Pick a Route</div><div class="hstep-d" data-i18n="h2d">Filter by route to see buses on that path. The route polyline appears on the map.</div></div></div>
+        <div class="help-step"><div class="hstep-n">3</div><div><div class="hstep-t" data-i18n="h3t">Click a Bus Marker</div><div class="hstep-d" data-i18n="h3d">Tap any bus icon on the map to view live speed, ETA, crowd level and next stop.</div></div></div>
+        <div class="help-step"><div class="hstep-n">4</div><div><div class="hstep-t" data-i18n="h4t">Filter by Stop</div><div class="hstep-d" data-i18n="h4d">Select a specific stop to zoom the map there and see approaching buses.</div></div></div>
+        <div class="help-contact">
+          <div class="hc-title" data-i18n="contactUs">📞 Contact Support</div>
+          <div class="hc-row"><span>📧</span><span>support@trackmybus.in</span></div>
+          <div class="hc-row"><span>📱</span><span>1800-123-4567 (Toll Free)</span></div>
+          <div class="hc-row"><span>🕐</span><span data-i18n="supportHours">Mon–Sat, 8am–8pm</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-sky"><div class="sky-orb orb1"></div><div class="sky-orb orb2"></div></div>
+    <div class="mt1"></div><div class="mt2"></div>
+    <div class="hero-road">
+      <div class="road-base">
+        <div class="road-dashes" id="road-dashes"></div>
+      </div>
+      <div class="hero-bus">
+        <svg width="155" height="72" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg">
+          <rect x="8" y="14" width="176" height="48" rx="8" fill="#e2391b"/>
+          <rect x="16" y="21" width="22" height="16" rx="3" fill="#b8d4f0" opacity=".9"/>
+          <rect x="44" y="21" width="22" height="16" rx="3" fill="#b8d4f0" opacity=".9"/>
+          <rect x="72" y="21" width="22" height="16" rx="3" fill="#b8d4f0" opacity=".9"/>
+          <rect x="100" y="21" width="22" height="16" rx="3" fill="#b8d4f0" opacity=".9"/>
+          <rect x="128" y="21" width="22" height="16" rx="3" fill="#b8d4f0" opacity=".9"/>
+          <rect x="156" y="18" width="24" height="28" rx="4" fill="#a0c4e8" opacity=".85"/>
+          <rect x="176" y="25" width="8" height="8" rx="2" fill="#ffe066"/>
+          <rect x="8" y="50" width="176" height="5" fill="#c42f18"/>
+          <circle cx="44" cy="63" r="12" fill="#1a1a2e"/><circle cx="44" cy="63" r="7" fill="#444"/><circle cx="44" cy="63" r="3" fill="#888"/>
+          <circle cx="148" cy="63" r="12" fill="#1a1a2e"/><circle cx="148" cy="63" r="7" fill="#444"/><circle cx="148" cy="63" r="3" fill="#888"/>
+          <text x="88" y="44" font-family="Arial" font-size="8" font-weight="bold" fill="white" text-anchor="middle">TrackMyBus</text>
+        </svg>
+      </div>
+      <span style="position:absolute;bottom:48px;left:4%;font-size:28px">🌲</span>
+      <span style="position:absolute;bottom:52px;left:11%;font-size:22px">🌳</span>
+      <span style="position:absolute;bottom:48px;right:28%;font-size:26px">🌳</span>
+      <span style="position:absolute;bottom:52px;right:16%;font-size:22px">🌲</span>
+    </div>
+    <div class="hero-content">
+      <div class="hero-badge"><div class="hero-bdot"></div><span data-i18n="heroBadge">Live Tracking Active</span></div>
+      <div class="hero-title" data-i18n="heroTitle">Real-Time Bus Tracking</div>
+    </div>
+  </div>
+
+  <!-- SEARCH BOX -->
+  <div class="search-outer">
+    <div class="search-box">
+      <div class="search-row">
+        <div class="sf">
+          <div class="sf-ico">📍</div>
+          <div class="sf-inner">
+            <div class="sf-lbl" data-i18n="fromCity">From City</div>
+            <select class="sf-inp" id="home-city" style="cursor:pointer">
+              <option value="">Select City</option>
+              <option>Salem</option><option>Erode</option><option>Tiruppur</option><option>Namakkal</option>
+            </select>
+          </div>
+        </div>
+        <div class="sf">
+          <div class="sf-ico">🎯</div>
+          <div class="sf-inner">
+            <div class="sf-lbl" data-i18n="routeDest">Route / Destination</div>
+            <input class="sf-inp" id="home-dest" placeholder="Enter route or destination" data-i18n-ph="routePh">
+          </div>
+        </div>
+        <div class="sf-date">
+          <div class="sf-ico">📅</div>
+          <div>
+            <div class="sf-lbl" data-i18n="trackDate">Track Date</div>
+            <div class="sf-val" id="today-date">—</div>
+            <div style="margin-top:4px"><span class="date-chip" data-i18n="todayLabel">Today</span></div>
+          </div>
+        </div>
+      </div>
+      <button class="btn-track" onclick="gotoTrack()"><span data-i18n="trackNow">🔍 Track Buses Now</span></button>
+    </div>
+  </div>
+
+  <!-- QUICK TRACK -->
+  <div class="sec">
+    <div class="sec-head">
+      <div><div class="sec-title" data-i18n="quickTitle">🎯 Quick Track</div><div class="sec-sub" data-i18n="quickSub">Popular cities & routes</div></div>
+      <a class="sec-link" onclick="gotoTrack()" data-i18n="viewAll">View All →</a>
+    </div>
+    <div class="offer-row">
+      <div class="ocard" onclick="quickTrack('Salem')" style="background:linear-gradient(135deg,#fff5f4,#fff)">
+        <div class="ocard-img" style="background:linear-gradient(135deg,#fde8e8,#fff5f4)">🏙️</div>
+        <div class="ocard-body"><div class="ocard-title">Salem</div><div class="ocard-sub">5 routes · 10 buses live</div></div>
+      </div>
+      <div class="ocard" onclick="quickTrack('Erode')" style="background:linear-gradient(135deg,#f0f9ff,#fff)">
+        <div class="ocard-img" style="background:linear-gradient(135deg,#dbeafe,#f0f9ff)">🌆</div>
+        <div class="ocard-body"><div class="ocard-title">Erode</div><div class="ocard-sub">4 routes · 8 buses live</div></div>
+      </div>
+      <div class="ocard" onclick="quickTrack('Tiruppur')" style="background:linear-gradient(135deg,#f0fdf4,#fff)">
+        <div class="ocard-img" style="background:linear-gradient(135deg,#dcfce7,#f0fdf4)">🌇</div>
+        <div class="ocard-body"><div class="ocard-title">Tiruppur</div><div class="ocard-sub">4 routes · 8 buses live</div></div>
+      </div>
+      <div class="ocard" onclick="quickTrack('Namakkal')" style="background:linear-gradient(135deg,#fefce8,#fff)">
+        <div class="ocard-img" style="background:linear-gradient(135deg,#fef9c3,#fefce8)">🌃</div>
+        <div class="ocard-body"><div class="ocard-title">Namakkal</div><div class="ocard-sub">3 routes · 6 buses live</div></div>
+      </div>
+      <div class="ocard" onclick="showPg('pg-admin-login')" style="background:linear-gradient(135deg,#fdf4ff,#fff)">
+        <div class="ocard-img" style="background:linear-gradient(135deg,#f3e8ff,#fdf4ff)">📊</div>
+        <div class="ocard-body"><div class="ocard-title">Dashboard</div><div class="ocard-sub">Fleet overview</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="divider"></div>
+
+  <!-- WHY -->
+  <div class="why">
+    <div class="why-title" data-i18n="whyTitle">Why Choose TrackMyBus?</div>
+    <div class="why-sub" data-i18n="whySub">Built for commuters in small cities</div>
+    <div class="feat-grid">
+      <div class="fitem"><div class="fitem-ico">📍</div><div><div class="fitem-t" data-i18n="f1t">Live Bus Positions</div><div class="fitem-d" data-i18n="f1d">Every second updates so you're always informed.</div></div></div>
+      <div class="fitem"><div class="fitem-ico">⏱️</div><div><div class="fitem-t" data-i18n="f2t">Accurate ETA</div><div class="fitem-d" data-i18n="f2d">Precise arrival estimates for every stop.</div></div></div>
+      <div class="fitem"><div class="fitem-ico">👥</div><div><div class="fitem-t" data-i18n="f3t">Crowd Levels</div><div class="fitem-d" data-i18n="f3d">Know if your bus is Low, Medium or High crowd.</div></div></div>
+      <div class="fitem"><div class="fitem-ico">🗺️</div><div><div class="fitem-t" data-i18n="f4t">Interactive Map</div><div class="fitem-d" data-i18n="f4d">See every bus moving live with route polylines.</div></div></div>
+      <div class="fitem"><div class="fitem-ico">🏙️</div><div><div class="fitem-t" data-i18n="f5t">Multi-City</div><div class="fitem-d" data-i18n="f5d">Salem, Erode, Tiruppur and Namakkal covered.</div></div></div>
+      <div class="fitem"><div class="fitem-ico">🔔</div><div><div class="fitem-t" data-i18n="f6t">Stop Tracking</div><div class="fitem-d" data-i18n="f6d">Filter to any stop and see approaching buses.</div></div></div>
+      <div class="fitem"><div class="fitem-ico">📱</div><div><div class="fitem-t" data-i18n="f7t">Mobile Ready</div><div class="fitem-d" data-i18n="f7d">Works on any device, no app needed.</div></div></div>
+      <div class="fitem"><div class="fitem-ico">🔒</div><div><div class="fitem-t" data-i18n="f8t">Admin Panel</div><div class="fitem-d" data-i18n="f8d">Full fleet management dashboard.</div></div></div>
+    </div>
+  </div>
+  <div class="divider"></div>
+
+  <!-- POPULAR ROUTES -->
+  <div class="sec">
+    <div class="sec-head">
+      <div class="sec-title">🛣️ Popular Bus Routes</div>
+      <a class="sec-link" onclick="gotoTrack()">Track All →</a>
+    </div>
+    <div class="route-grid">
+      <div class="rchip" onclick="gotoTrack()"><span>Railway Station → Airport</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Salem → Yercaud</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Erode → Bhavani</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Tiruppur → Avinashi</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Namakkal → Rasipuram</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Erode → Gobichettipalayam</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Tiruppur → Coimbatore</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Namakkal → Tiruchengode</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Omalur → Steel Plant</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Kangeyam → Collectorate</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Udumalpet → Tiruppur</span><span class="rchip-arr">›</span></div>
+      <div class="rchip" onclick="gotoTrack()"><span>Shevapet → Suramangalam</span><span class="rchip-arr">›</span></div>
+    </div>
+  </div>
+  <div class="divider"></div>
+
+  <!-- FAQ -->
+  <div class="faq-sec">
+    <div style="font-size:1.2rem;font-weight:700;color:#222;margin-bottom:.25rem">❓ FAQs</div>
+    <div style="font-size:.82rem;color:#999;margin-bottom:1.2rem">Everything you need to know</div>
+    <div class="faq-tabs">
+      <div class="ftab on" onclick="faqTab('general',this)">General</div>
+      <div class="ftab" onclick="faqTab('tracking',this)">Tracking</div>
+      <div class="ftab" onclick="faqTab('cities',this)">Cities</div>
+    </div>
+    <div id="faq-general" class="faq-list">
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What is TrackMyBus?<span class="faq-chev">▼</span></div><div class="faq-a">TrackMyBus is a real-time bus tracking system for small cities. See live positions, ETAs, crowd levels — all free.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Which cities are covered?<span class="faq-chev">▼</span></div><div class="faq-a">Salem, Erode, Tiruppur and Namakkal with 16 routes and 32 buses. More cities coming soon.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Is it free to use?<span class="faq-chev">▼</span></div><div class="faq-a">Yes, completely free for all commuters. No registration needed to track buses.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How often does position update?<span class="faq-chev">▼</span></div><div class="faq-a">Every second — like real GPS tracking. The map always shows the most current location.</div></div>
+    </div>
+    <div id="faq-tracking" class="faq-list" style="display:none">
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How do I track a bus?<span class="faq-chev">▼</span></div><div class="faq-a">Click Track Buses Now. Select city and route. All buses appear as live markers on the map.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What does clicking a bus show?<span class="faq-chev">▼</span></div><div class="faq-a">Bus ID, City, Route, speed, ETA to next stop, distance, crowd level and moving/stopped status.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">What are crowd levels?<span class="faq-chev">▼</span></div><div class="faq-a">Low (few passengers), Medium (moderately full) or High (very crowded).</div></div>
+    </div>
+    <div id="faq-cities" class="faq-list" style="display:none">
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How many routes in Salem?<span class="faq-chev">▼</span></div><div class="faq-a">5 routes: Railway Station→Airport, Bus Stand→Yercaud, Shevapet→Suramangalam, Five Roads→Kondalampatti, Omalur→Steel Plant.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">How many routes in Erode?<span class="faq-chev">▼</span></div><div class="faq-a">4 routes: Erode Stand→Bhavani, Erode Jn→Gobichettipalayam, Perundurai→Erode, Kangeyam→Collectorate.</div></div>
+      <div class="faq-item"><div class="faq-q" onclick="toggleFaq(this)">Routes in Tiruppur & Namakkal?<span class="faq-chev">▼</span></div><div class="faq-a">Tiruppur: 4 routes. Namakkal: 3 routes including Namakkal→Rasipuram, →Tiruchengode, →Mohanur.</div></div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div>
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:.8rem">
+        <div class="brand-icon" style="width:30px;height:30px;font-size:14px;border-radius:8px">🚌</div>
+        <div class="brand-name" style="font-size:.95rem">TrackMyBus</div>
+      </div>
+      <div style="font-size:.76rem;color:#aaa;line-height:1.6">Real-time bus tracking for small cities. Free for all commuters.</div>
+    </div>
+    <div>
+      <div class="fg-title">Cities</div>
+      <div class="fg-link" onclick="quickTrack('Salem')">Salem</div>
+      <div class="fg-link" onclick="quickTrack('Erode')">Erode</div>
+      <div class="fg-link" onclick="quickTrack('Tiruppur')">Tiruppur</div>
+      <div class="fg-link" onclick="quickTrack('Namakkal')">Namakkal</div>
+    </div>
+    <div>
+      <div class="fg-title">Features</div>
+      <div class="fg-link">Live Tracking</div>
+      <div class="fg-link">ETA Calculator</div>
+      <div class="fg-link">Crowd Info</div>
+      <div class="fg-link">Route Map</div>
+    </div>
+    <div>
+      <div class="fg-title">Admin</div>
+      <div class="fg-link" onclick="showPg('pg-admin-login')">Admin Login</div>
+      <div class="fg-link">Manage Routes</div>
+      <div class="fg-link">Manage Buses</div>
+      <div class="fg-link">Dashboard</div>
+    </div>
+  </div>
+  <div class="footer-btm">
+    <span>© 2026 <span class="footer-brand">TrackMyBus</span>. Built for Tamil Nadu commuters.</span>
+    <span>Salem · Erode · Tiruppur · Namakkal</span>
+  </div>
+</div>
+
+<!-- ████████████ TRACK PAGE ████████████ -->
+<div id="pg-track" class="page">
+  <div class="track-nav-bar">
+    <div class="track-left">
+      <div class="brand" onclick="showPg('pg-home')" style="cursor:pointer">
+        <div class="brand-icon" style="width:32px;height:32px;font-size:15px;border-radius:8px">🚌</div>
+        <div class="brand-name" style="font-size:1rem">TrackMyBus</div>
+      </div>
+      <div class="live-pill"><div class="live-dot"></div>Live</div>
+    </div>
+    <div class="track-right">
+      <button class="tnpill" onclick="showPg('pg-home')">← Home</button>
+      <button class="tnpill" onclick="showPg('pg-admin-login')">Admin</button>
+      <button class="tnpill red">🗺️ Live Map</button>
+    </div>
+  </div>
+  <div class="track-body">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sb-head"><div class="sb-title" data-i18n="liveTracker">Live Tracker</div><div class="sb-sub" data-i18n="filterHint">Filter by city, route or stop</div></div>
+      <div class="sb-body">
+        <div class="ctrl-g"><div class="ctrl-lbl" data-i18n="cityLbl">City</div><select class="ctrl-sel" id="sel-city" onchange="onCity()"><option value="">— Choose City —</option></select></div>
+        <div class="ctrl-g"><div class="ctrl-lbl" data-i18n="routeLbl">Route</div><select class="ctrl-sel" id="sel-route" onchange="onRoute()"><option value="">— All Routes —</option></select></div>
+        <div class="ctrl-g"><div class="ctrl-lbl" data-i18n="stopLbl">Stop</div><select class="ctrl-sel" id="sel-stop" onchange="onStop()"><option value="">— All Stops —</option></select></div>
+        <div class="ctrl-g" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+          <div class="bcnt-row"><div class="ctrl-lbl" data-i18n="activeBuses">Active Buses</div><div class="bcnt-badge" id="bcnt">0</div></div>
+          <div class="bus-cards" id="bus-cards" style="overflow-y:auto;flex:1;margin-top:.4rem"></div>
+        </div>
+      </div>
+    </div>
+    <!-- Map -->
+    <div class="map-wrap">
+      <div class="map-loader" id="map-loader"><div class="spin"></div><div style="font-size:.82rem;color:#bbb">Loading live map…</div></div>
+      <div id="map"></div>
+      <div class="map-status">
+        <div class="map-badge"><div class="mbdot" style="background:#16a34a;box-shadow:0 0 6px #16a34a"></div><span id="mv-cnt">0</span>&nbsp;Moving</div>
+        <div class="map-badge"><div class="mbdot" style="background:#d97706"></div><span id="st-cnt">0</span>&nbsp;Stopped</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ████████████ LOGIN PAGE ████████████ -->
+<div id="pg-admin-login" class="page">
+  <div class="login-bg">
+    <div class="lbg-c lbg-c1"></div><div class="lbg-c lbg-c2"></div><div class="lbg-c lbg-c3"></div>
+    <div class="lbg-grid"></div>
+  </div>
+  <div class="login-topbar">
+    <div class="brand" onclick="showPg('pg-home')" style="cursor:pointer">
+      <div class="brand-icon" style="width:34px;height:34px;font-size:16px;border-radius:9px">🚌</div>
+      <div class="brand-name" style="font-size:1.05rem">TrackMyBus</div>
+    </div>
+    <button class="tnpill" onclick="showPg('pg-home')">← Back to Home</button>
+  </div>
+  <div class="login-center">
+    <div class="lcard">
+      <!-- Left -->
+      <div class="lcard-l">
+        <div class="ll-icon">🚌</div>
+        <div class="ll-title">Admin Portal</div>
+        <div class="ll-sub">Manage your entire bus tracking system from one powerful dashboard.</div>
+        <div class="ll-feats">
+          <div class="llf"><span class="llf-dot"></span>Real-time fleet monitoring</div>
+          <div class="llf"><span class="llf-dot"></span>City & route management</div>
+          <div class="llf"><span class="llf-dot"></span>Advanced analytics charts</div>
+          <div class="llf"><span class="llf-dot"></span>Live bus control</div>
+        </div>
+        <div class="ll-road">
+          <div class="ll-road-line"></div>
+          <div class="ll-bus">🚌</div>
+        </div>
+      </div>
+      <!-- Right -->
+      <div class="lcard-r">
+        <div class="lr-inner">
+          <div class="lr-badge"><div class="lr-badge-dot"></div>Secure Admin Access</div>
+          <div class="lr-title">Welcome back</div>
+          <div class="lr-sub">Sign in to manage TrackMyBus</div>
+          <div class="lf-grp">
+            <label class="lf-lbl">Username</label>
+            <div class="lf-wrap">
+              <span class="lf-ico">👤</span>
+              <input class="lf-inp" type="text" id="inp-u" placeholder="Enter username" value="admin">
+            </div>
+          </div>
+          <div class="lf-grp">
+            <label class="lf-lbl">Password</label>
+            <div class="lf-wrap">
+              <span class="lf-ico">🔑</span>
+              <input class="lf-inp" type="password" id="inp-p" placeholder="Enter password" value="admin123" onkeydown="if(event.key==='Enter')doLogin()">
+              <span class="lf-eye" onclick="togglePwd(this)" id="pwd-eye">👁️</span>
+            </div>
+          </div>
+          <div class="lerr" id="lerr">⚠️ Invalid credentials. Use admin / admin123</div>
+          <button class="lbtn" id="lbtn" onclick="doLogin()">
+            <span id="lbtn-txt">Sign In</span>
+            <span class="lbtn-arr">→</span>
+            <div class="lbtn-ripple" id="lbtn-ripple"></div>
+          </button>
+          <div class="demo-row">
+            <span class="demo-lbl">Demo:</span>
+            <div class="demo-chips">
+              <span class="demo-chip" onclick="document.getElementById('inp-u').value='admin'">admin</span>
+              <span style="color:#ddd">/</span>
+              <span class="demo-chip" onclick="document.getElementById('inp-p').value='admin123'">admin123</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ████████████ DASHBOARD ████████████ -->
+<div id="pg-dash" class="page">
+  <nav class="topnav">
+    <div class="nav-left">
+      <div class="brand" onclick="showPg('pg-home')" style="cursor:pointer">
+        <div class="brand-icon" style="width:32px;height:32px;font-size:15px;border-radius:8px">🚌</div>
+        <div class="brand-name" style="font-size:1rem">TrackMyBus</div>
+      </div>
+      <div class="live-pill" style="margin-left:1rem"><div class="live-dot"></div>Dashboard Live</div>
+    </div>
+    <div class="nav-right">
+      <button class="tnpill" onclick="showPg('pg-track')">Live Map</button>
+      <button class="tnpill red" onclick="doLogout()">Logout</button>
+    </div>
+  </nav>
+  <div class="dash-body">
+    <div class="dsec-lbl" style="margin-top:.2rem">Fleet Overview</div>
+    <div class="mgrid">
+      <div class="mcard"><div class="mcard-bar" style="background:#e2391b"></div><div class="m-lbl">Total Cities</div><div class="m-val" id="m-c">4</div><div class="m-ico">🏙️</div></div>
+      <div class="mcard"><div class="mcard-bar" style="background:#2563eb"></div><div class="m-lbl">Total Routes</div><div class="m-val" id="m-r">0</div><div class="m-ico">🛣️</div></div>
+      <div class="mcard"><div class="mcard-bar" style="background:#7c3aed"></div><div class="m-lbl">Total Stops</div><div class="m-val" id="m-s">0</div><div class="m-ico">📍</div></div>
+      <div class="mcard"><div class="mcard-bar" style="background:#0891b2"></div><div class="m-lbl">Total Buses</div><div class="m-val" id="m-b">0</div><div class="m-ico">🚌</div></div>
+      <div class="mcard"><div class="mcard-bar" style="background:#16a34a"></div><div class="m-lbl">Active Buses</div><div class="m-val" id="m-a" style="color:#16a34a">0</div><div class="m-sub" id="m-ap"></div><div class="m-ico">✅</div></div>
+      <div class="mcard"><div class="mcard-bar" style="background:#d97706"></div><div class="m-lbl">Avg Speed (km/h)</div><div class="m-val" id="m-sp" style="color:#d97706">0</div><div class="m-ico">⚡</div></div>
+    </div>
+    <div class="dsec-lbl">Live Insights</div>
+    <div class="irow">
+      <div class="icard"><div class="i-ico" style="background:#f0fdf4">🟢</div><div><div class="i-lbl">Moving Now</div><div class="i-val" id="i-m" style="color:#16a34a">0</div></div></div>
+      <div class="icard"><div class="i-ico" style="background:#fffbeb">🟡</div><div><div class="i-lbl">Stopped Now</div><div class="i-val" id="i-s" style="color:#d97706">0</div></div></div>
+      <div class="icard"><div class="i-ico" style="background:#fff1f2">🔴</div><div><div class="i-lbl">High Crowd</div><div class="i-val" id="i-c" style="color:#e11d48">0</div></div></div>
+    </div>
+    <div class="dsec-lbl">Analytics</div>
+    <!-- Row 1 -->
+    <div class="cgrid3">
+      <div class="ccard"><div class="c-title">Buses per City</div><div class="cbox"><canvas id="ch-city"></canvas></div></div>
+      <div class="ccard"><div class="c-title">Speed Distribution</div><div class="cbox"><canvas id="ch-speed"></canvas></div></div>
+      <div class="ccard"><div class="c-title">Idle vs Moving</div><div class="cbox"><canvas id="ch-idle"></canvas></div></div>
+    </div>
+    <!-- Row 2 -->
+    <div class="cgrid2">
+      <div class="ccard"><div class="c-title">Avg Travel Time per Route (min)</div><div class="cbox-tall"><canvas id="ch-travel"></canvas></div></div>
+      <div class="ccard"><div class="c-title">Delay Reasons (Stacked)</div><div class="cbox-tall"><canvas id="ch-delay"></canvas></div></div>
+    </div>
+    <!-- Row 3 -->
+    <div class="cgrid2">
+      <div class="ccard"><div class="c-title">Passenger Load per Stop</div><div class="cbox-tall"><canvas id="ch-load"></canvas></div></div>
+      <div class="ccard"><div class="c-title">Bus Frequency (Morning / Evening / Night)</div><div class="cbox-tall"><canvas id="ch-freq"></canvas></div></div>
+    </div>
+    <!-- Row 4: Gauge + Heatmap -->
+    <div class="cgrid-gauge">
+      <div class="ccard gauge-wrap">
+        <div class="c-title" style="width:100%">System Utilisation</div>
+        <canvas id="ch-gauge" width="240" height="168"></canvas>
+        <div class="gauge-lbl" id="gauge-lbl">0%</div>
+        <div class="gauge-sub">Fleet Active Rate</div>
+      </div>
+      <div class="ccard">
+        <div class="c-title">Peak Hour Heatmap (Buses Active)</div>
+        <div id="heatmap-grid"></div>
+      </div>
+    </div>
+    <div class="dsec-lbl">Management</div>
+    <div class="mnav">
+      <button class="mbtn on" onclick="swTab('cities',this)">🏙️ Cities</button>
+      <button class="mbtn" onclick="swTab('routes',this)">🛣️ Routes</button>
+      <button class="mbtn" onclick="swTab('stops',this)">📍 Stops</button>
+      <button class="mbtn" onclick="swTab('buses',this)">🚌 Buses</button>
+    </div>
+    <div class="mpanel on" id="tp-cities">
+      <div class="mfrow"><input class="minp" id="ac-n" placeholder="City name" style="flex:1;min-width:100px"><input class="minp" id="ac-lat" placeholder="Latitude" style="width:100px"><input class="minp" id="ac-lng" placeholder="Longitude" style="width:100px"><button class="btnadd" onclick="addCity()">+ Add City</button></div>
+      <table class="dtbl"><thead><tr><th>City</th><th>Lat</th><th>Lng</th><th>Routes</th><th>Buses</th><th></th></tr></thead><tbody id="tb-c"></tbody></table>
+    </div>
+    <div class="mpanel" id="tp-routes">
+      <div class="mfrow"><select class="msel" id="ar-c" style="flex:1;min-width:110px"></select><input class="minp" id="ar-n" placeholder="Route name (A → B)" style="flex:2;min-width:140px"><button class="btnadd" onclick="addRoute()">+ Add Route</button></div>
+      <table class="dtbl"><thead><tr><th>Route</th><th>City</th><th>Stops</th><th>Buses</th><th></th></tr></thead><tbody id="tb-r"></tbody></table>
+    </div>
+    <div class="mpanel" id="tp-stops">
+      <div class="mfrow"><select class="msel" id="as-r" style="flex:1;min-width:150px"></select><input class="minp" id="as-n" placeholder="Stop name" style="flex:2;min-width:110px"><input class="minp" id="as-lat" placeholder="Lat" style="width:80px"><input class="minp" id="as-lng" placeholder="Lng" style="width:80px"><button class="btnadd" onclick="addStop()">+ Add</button></div>
+      <table class="dtbl"><thead><tr><th>Stop</th><th>Route</th><th>City</th><th>Lat</th><th>Lng</th><th></th></tr></thead><tbody id="tb-s"></tbody></table>
+    </div>
+    <div class="mpanel" id="tp-buses">
+      <div class="mfrow"><select class="msel" id="ab-r" style="flex:1;min-width:190px"></select><input class="minp" id="ab-id" placeholder="Bus plate (TN33A1234)" style="flex:2;min-width:150px"><button class="btnadd" onclick="addBus()">+ Add Bus</button></div>
+      <table class="dtbl"><thead><tr><th>Plate</th><th>Route</th><th>City</th><th>Status</th><th>Speed</th><th>Crowd</th><th></th></tr></thead><tbody id="tb-b"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════
+   DATA
+══════════════════════════════════════ */
+const DB={
+  cities:[
+    {id:'c1',name:'Salem',   lat:11.6643,lng:78.1460,color:'#e2391b'},
+    {id:'c2',name:'Erode',   lat:11.3410,lng:77.7172,color:'#2563eb'},
+    {id:'c3',name:'Tiruppur',lat:11.1085,lng:77.3411,color:'#16a34a'},
+    {id:'c4',name:'Namakkal',lat:11.2189,lng:78.1668,color:'#d97706'},
+  ],
+  routes:[
+    {id:'r1',cId:'c1',name:'Railway Station → Salem Airport'},
+    {id:'r2',cId:'c1',name:'Salem Bus Stand → Yercaud'},
+    {id:'r3',cId:'c1',name:'Shevapet → Suramangalam'},
+    {id:'r4',cId:'c1',name:'Five Roads → Kondalampatti'},
+    {id:'r5',cId:'c1',name:'Omalur → Steel Plant'},
+    {id:'r6',cId:'c2',name:'Erode Stand → Bhavani'},
+    {id:'r7',cId:'c2',name:'Erode Junction → Gobichettipalayam'},
+    {id:'r8',cId:'c2',name:'Perundurai → Erode'},
+    {id:'r9',cId:'c2',name:'Kangeyam → Collectorate'},
+    {id:'r10',cId:'c3',name:'Tiruppur → Avinashi'},
+    {id:'r11',cId:'c3',name:'Tiruppur → Palladam'},
+    {id:'r12',cId:'c3',name:'Udumalpet → Tiruppur'},
+    {id:'r13',cId:'c3',name:'Tiruppur → Coimbatore'},
+    {id:'r14',cId:'c4',name:'Namakkal → Rasipuram'},
+    {id:'r15',cId:'c4',name:'Namakkal → Tiruchengode'},
+    {id:'r16',cId:'c4',name:'Namakkal → Mohanur'},
+  ],
+  stops:[
+    {id:'s1',rId:'r1',name:'Railway Station',lat:11.6795,lng:78.1447,o:0},
+    {id:'s2',rId:'r1',name:'Shevapet',lat:11.6753,lng:78.1502,o:1},
+    {id:'s3',rId:'r1',name:'Gugai',lat:11.6669,lng:78.1539,o:2},
+    {id:'s4',rId:'r1',name:'Junction Circle',lat:11.6643,lng:78.1460,o:3},
+    {id:'s5',rId:'r1',name:'Salem Airport',lat:11.6553,lng:78.0619,o:4},
+    {id:'s6',rId:'r2',name:'Salem Bus Stand',lat:11.6636,lng:78.1573,o:0},
+    {id:'s7',rId:'r2',name:'Hasthampatti',lat:11.6822,lng:78.1519,o:1},
+    {id:'s8',rId:'r2',name:'Kitchipalayam',lat:11.7012,lng:78.1483,o:2},
+    {id:'s9',rId:'r2',name:'Yercaud Foot',lat:11.7755,lng:78.1981,o:3},
+    {id:'s10',rId:'r2',name:'Yercaud',lat:11.7784,lng:78.2088,o:4},
+    {id:'s11',rId:'r3',name:'Shevapet',lat:11.6753,lng:78.1502,o:0},
+    {id:'s12',rId:'r3',name:'Meyyanur',lat:11.6700,lng:78.1408,o:1},
+    {id:'s13',rId:'r3',name:'Suramangalam',lat:11.6609,lng:78.1285,o:2},
+    {id:'s14',rId:'r3',name:'Flower Bazaar',lat:11.6562,lng:78.1397,o:3},
+    {id:'s15',rId:'r4',name:'Five Roads',lat:11.6715,lng:78.1562,o:0},
+    {id:'s16',rId:'r4',name:'Swarnapuri',lat:11.6748,lng:78.1703,o:1},
+    {id:'s17',rId:'r4',name:'Kondalampatti',lat:11.6780,lng:78.1850,o:2},
+    {id:'s18',rId:'r5',name:'Omalur',lat:11.7334,lng:78.0542,o:0},
+    {id:'s19',rId:'r5',name:'Salapur',lat:11.7002,lng:78.0810,o:1},
+    {id:'s20',rId:'r5',name:'Steel Plant Gate',lat:11.6785,lng:78.1178,o:2},
+    {id:'s21',rId:'r6',name:'Erode Bus Stand',lat:11.3453,lng:77.7271,o:0},
+    {id:'s22',rId:'r6',name:'Erode Junction',lat:11.3390,lng:77.7217,o:1},
+    {id:'s23',rId:'r6',name:'Cauvery Bridge',lat:11.3270,lng:77.7180,o:2},
+    {id:'s24',rId:'r6',name:'Bhavani',lat:11.4458,lng:77.6813,o:3},
+    {id:'s25',rId:'r7',name:'Erode Junction',lat:11.3390,lng:77.7217,o:0},
+    {id:'s26',rId:'r7',name:'Perundurai Road',lat:11.3500,lng:77.7500,o:1},
+    {id:'s27',rId:'r7',name:'Gobichettipalayam',lat:11.4564,lng:77.4353,o:2},
+    {id:'s28',rId:'r8',name:'Perundurai',lat:11.2769,lng:77.5866,o:0},
+    {id:'s29',rId:'r8',name:'SIDCO',lat:11.3200,lng:77.6800,o:1},
+    {id:'s30',rId:'r8',name:'Erode',lat:11.3410,lng:77.7172,o:2},
+    {id:'s31',rId:'r9',name:'Kangeyam',lat:11.0069,lng:77.5595,o:0},
+    {id:'s32',rId:'r9',name:'Nambiyur',lat:11.1800,lng:77.6500,o:1},
+    {id:'s33',rId:'r9',name:'Erode Collectorate',lat:11.3420,lng:77.7180,o:2},
+    {id:'s34',rId:'r10',name:'Tiruppur',lat:11.1085,lng:77.3411,o:0},
+    {id:'s35',rId:'r10',name:'Kasipalayam',lat:11.1300,lng:77.3600,o:1},
+    {id:'s36',rId:'r10',name:'Avinashi',lat:11.1921,lng:77.2683,o:2},
+    {id:'s37',rId:'r11',name:'Tiruppur Bus Stand',lat:11.1085,lng:77.3411,o:0},
+    {id:'s38',rId:'r11',name:'Dharapuram Road',lat:11.0800,lng:77.3600,o:1},
+    {id:'s39',rId:'r11',name:'Palladam',lat:11.0091,lng:77.2925,o:2},
+    {id:'s40',rId:'r12',name:'Udumalpet',lat:10.5836,lng:77.2472,o:0},
+    {id:'s41',rId:'r12',name:'Dharapuram',lat:10.7337,lng:77.4953,o:1},
+    {id:'s42',rId:'r12',name:'Tiruppur',lat:11.1085,lng:77.3411,o:2},
+    {id:'s43',rId:'r13',name:'Tiruppur',lat:11.1085,lng:77.3411,o:0},
+    {id:'s44',rId:'r13',name:'Mettupalayam Rd',lat:11.1500,lng:77.3000,o:1},
+    {id:'s45',rId:'r13',name:'Coimbatore',lat:11.0168,lng:76.9558,o:2},
+    {id:'s46',rId:'r14',name:'Namakkal',lat:11.2189,lng:78.1668,o:0},
+    {id:'s47',rId:'r14',name:'Valappady',lat:11.3010,lng:78.1600,o:1},
+    {id:'s48',rId:'r14',name:'Rasipuram',lat:11.4610,lng:78.1270,o:2},
+    {id:'s49',rId:'r15',name:'Namakkal',lat:11.2189,lng:78.1668,o:0},
+    {id:'s50',rId:'r15',name:'Erumapatti',lat:11.2600,lng:77.9000,o:1},
+    {id:'s51',rId:'r15',name:'Tiruchengode',lat:11.3857,lng:77.8954,o:2},
+    {id:'s52',rId:'r16',name:'Namakkal',lat:11.2189,lng:78.1668,o:0},
+    {id:'s53',rId:'r16',name:'Paramathi',lat:11.2300,lng:78.2200,o:1},
+    {id:'s54',rId:'r16',name:'Mohanur',lat:11.1895,lng:78.2620,o:2},
+  ],
+  buses:[]
+};
+
+/* Seed 2 buses per route */
+(function(){
+  let n=1;
+  DB.routes.forEach(r=>{
+    const stops=DB.stops.filter(s=>s.rId===r.id).sort((a,b)=>a.o-b.o);
+    if(!stops.length)return;
+    const city=DB.cities.find(c=>c.id===r.cId);
+    const pfx=city?city.name.slice(0,2).toUpperCase():'TN';
+    [0,1].forEach(()=>{
+      const si=Math.floor(Math.random()*Math.max(1,stops.length-1));
+      DB.buses.push({
+        id:'B'+String(n++).padStart(3,'0'),
+        plate:'TN'+Math.floor(10+Math.random()*89)+pfx[0]+Math.floor(1000+Math.random()*9000),
+        rId:r.id,cId:r.cId,si,prog:Math.random(),
+        spd:+(25+Math.random()*15).toFixed(1),
+        crowd:['Low','Medium','High'][Math.floor(Math.random()*3)],
+        status:'Moving',stT:0,
+        lat:stops[si].lat,lng:stops[si].lng
+      });
+    });
+  });
+})();
+
+/* ══════════════════════════════════════
+   SIMULATION (1-second GPS updates)
+══════════════════════════════════════ */
+function stopsFor(rId){return DB.stops.filter(s=>s.rId===rId).sort((a,b)=>a.o-b.o)}
+function lerp(a,b,t){return{lat:a.lat+(b.lat-a.lat)*t,lng:a.lng+(b.lng-a.lng)*t}}
+function hdist(a,b){
+  const R=6371,dl=(b.lat-a.lat)*Math.PI/180,dg=(b.lng-a.lng)*Math.PI/180;
+  const x=Math.sin(dl/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dg/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+function tickBus(b){
+  const stops=stopsFor(b.rId);
+  if(stops.length<2)return;
+  if(b.status==='Stopped'){
+    b.stT++;
+    if(b.stT>=4){b.status='Moving';b.stT=0;b.spd=+(25+Math.random()*15).toFixed(1);b.crowd=['Low','Medium','High'][Math.floor(Math.random()*3)]}
+    return;
+  }
+  b.prog+=1/120;
+  if(b.prog>=1){
+    b.prog=0;b.si=(b.si+1)%stops.length;b.status='Stopped';b.stT=0;
+    b.lat=stops[b.si].lat;b.lng=stops[b.si].lng;
+    return;
+  }
+  const p=lerp(stops[b.si],stops[(b.si+1)%stops.length],b.prog);
+  b.lat=p.lat;b.lng=p.lng;
+  if(Math.random()<.08)b.spd=+(Math.max(22,Math.min(42,b.spd+(Math.random()*2-1)))).toFixed(1);
+}
+let simT=null;
+function startSim(){
+  if(simT)return;
+  simT=setInterval(()=>{
+    DB.buses.forEach(tickBus);
+    refreshMarkers();refreshBusCards();refreshMini();
+    if(document.getElementById('pg-dash').classList.contains('active'))refreshDashLive();
+  },1000);
+}
+
+/* ══════════════════════════════════════
+   MAP
+══════════════════════════════════════ */
+let map=null,rLayer=null,sLayer=null;
+const bMkrs={};
+let curC='',curR='';
+
+function initMap(){
+  if(map)return;
+  map=L.map('map',{zoomControl:true,preferCanvas:true,attributionControl:false}).setView([11.35,77.9],9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+  setTimeout(()=>{
+    const el=document.getElementById('map-loader');
+    if(el){el.classList.add('gone');setTimeout(()=>el.style.display='none',500)}
+  },1500);
+}
+
+function busIcon(b){
+  const city=DB.cities.find(c=>c.id===b.cId)||{color:'#e2391b'};
+  const col=b.status==='Moving'?city.color:'#d97706';
+  return L.divIcon({
+    className:'',
+    html:`<div style="width:32px;height:32px;border-radius:50%;background:${col};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer">${b.status==='Moving'?'🚌':'🚎'}</div>`,
+    iconSize:[32,32],iconAnchor:[16,16]
+  });
+}
+function stopIcon(){
+  return L.divIcon({
+    className:'',
+    html:'<div style="width:10px;height:10px;border-radius:50%;background:rgba(37,99,235,.5);border:2px solid rgba(255,255,255,.9);box-shadow:0 1px 4px rgba(37,99,235,.4)"></div>',
+    iconSize:[10,10],iconAnchor:[5,5]
+  });
+}
+function nextStop(b){const s=stopsFor(b.rId);return s.length?s[(b.si+1)%s.length].name:'N/A'}
+function etaStr(b){
+  const s=stopsFor(b.rId);
+  if(!s.length||b.status==='Stopped')return 'At Stop';
+  const d=(1-b.prog)*hdist(s[b.si],s[(b.si+1)%s.length]);
+  return Math.max(1,Math.round(d/b.spd*60))+'m';
+}
+function dstStr(b){
+  const s=stopsFor(b.rId);
+  if(!s.length)return '0';
+  return hdist({lat:b.lat,lng:b.lng},s[(b.si+1)%s.length]).toFixed(1);
+}
+function popupHTML(b){
+  const route=DB.routes.find(r=>r.id===b.rId)||{name:'N/A'};
+  const city=DB.cities.find(c=>c.id===b.cId)||{name:'N/A'};
+  const stops=stopsFor(b.rId);
+  const cs=stops[b.si]||{name:'N/A'};
+  const stCol=b.status==='Moving'?'#16a34a':'#d97706';
+  const stBg=b.status==='Moving'?'#f0fdf4':'#fffbeb';
+  const stBd=b.status==='Moving'?'#bbf7d0':'#fde68a';
+  const cmap={Low:'#16a34a',Medium:'#d97706',High:'#e11d48'};
+  return`<div class="pw">
+    <div class="pw-head">
+      <div class="pw-id">🚌 ${b.plate}</div>
+      <div class="pw-st" style="background:${stBg};color:${stCol};border:1px solid ${stBd}">${b.status}</div>
+    </div>
+    <div class="pw-grid">
+      <div class="pw-cell"><div class="pw-k">City</div><div class="pw-v">${city.name}</div></div>
+      <div class="pw-cell"><div class="pw-k">Route</div><div class="pw-v" style="font-size:.7rem">${route.name.split('→')[0].trim()}→…</div></div>
+      <div class="pw-cell"><div class="pw-k">${b.status==='Stopped'?'At Stop':'Between'}</div><div class="pw-v" style="font-size:.7rem">${b.status==='Stopped'?cs.name:'Stops'}</div></div>
+      <div class="pw-cell"><div class="pw-k">Next Stop</div><div class="pw-v" style="font-size:.7rem">${nextStop(b)}</div></div>
+      <div class="pw-cell"><div class="pw-k">Speed</div><div class="pw-v">${b.status==='Stopped'?0:b.spd} km/h</div></div>
+      <div class="pw-cell"><div class="pw-k">ETA</div><div class="pw-v">${etaStr(b)}</div></div>
+      <div class="pw-cell"><div class="pw-k">Distance</div><div class="pw-v">${dstStr(b)} km</div></div>
+      <div class="pw-cell"><div class="pw-k">Crowd</div><div class="pw-v" style="color:${cmap[b.crowd]};font-weight:700">${b.crowd}</div></div>
+    </div>
+  </div>`;
+}
+function refreshMarkers(){
+  if(!map)return;
+  const vis=curR?DB.buses.filter(b=>b.rId===curR):curC?DB.buses.filter(b=>b.cId===curC):DB.buses;
+  const vs=new Set(vis.map(b=>b.id));
+  Object.keys(bMkrs).forEach(id=>{if(!vs.has(id)){bMkrs[id].remove();delete bMkrs[id]}});
+  vis.forEach(b=>{
+    if(bMkrs[b.id]){bMkrs[b.id].setLatLng([b.lat,b.lng]);bMkrs[b.id].setIcon(busIcon(b))}
+    else{
+      const m=L.marker([b.lat,b.lng],{icon:busIcon(b),zIndexOffset:1000}).addTo(map);
+      m.bindPopup(()=>popupHTML(b),{maxWidth:268});
+      bMkrs[b.id]=m;
+    }
+  });
+}
+function clrLayers(){if(rLayer){rLayer.remove();rLayer=null}if(sLayer){sLayer.remove();sLayer=null}}
+function drawRoute(rId){
+  clrLayers();
+  const stops=stopsFor(rId);if(!stops.length)return;
+  const city=DB.cities.find(c=>c.id===(DB.routes.find(r=>r.id===rId)||{}).cId)||{color:'#e2391b'};
+  rLayer=L.polyline(stops.map(s=>[s.lat,s.lng]),{color:city.color,weight:3,opacity:.85}).addTo(map);
+  sLayer=L.layerGroup(stops.map(s=>L.marker([s.lat,s.lng],{icon:stopIcon()}).bindPopup(`<b style="font-family:Inter,sans-serif;font-size:.85rem;color:#222">${s.name}</b>`))).addTo(map);
+  map.fitBounds(rLayer.getBounds(),{padding:[50,50]});
+}
+function drawCity(cId){
+  clrLayers();
+  const city=DB.cities.find(c=>c.id===cId);if(!city)return;
+  const lyrs=DB.routes.filter(r=>r.cId===cId).map(r=>{
+    const s=stopsFor(r.id);
+    return s.length>1?L.polyline(s.map(x=>[x.lat,x.lng]),{color:city.color,weight:2,opacity:.25}):null;
+  }).filter(Boolean);
+  rLayer=L.layerGroup(lyrs).addTo(map);
+  map.setView([city.lat,city.lng],12);
+}
+function refreshMini(){
+  const mv=DB.buses.filter(b=>b.status==='Moving').length;
+  const st=DB.buses.filter(b=>b.status==='Stopped').length;
+  const me=document.getElementById('mv-cnt'),se=document.getElementById('st-cnt');
+  if(me)me.textContent=mv;if(se)se.textContent=st;
+}
+
+/* ══════════════════════════════════════
+   TRACK PAGE CONTROLS
+══════════════════════════════════════ */
+function populateCityDrop(){
+  const sel=document.getElementById('sel-city');
+  sel.innerHTML='<option value="">— Choose City —</option>';
+  DB.cities.forEach(c=>sel.appendChild(new Option(c.name,c.id)));
+}
+function onCity(){
+  curC=document.getElementById('sel-city').value;curR='';
+  const rs=document.getElementById('sel-route');rs.innerHTML='<option value="">— All Routes —</option>';
+  document.getElementById('sel-stop').innerHTML='<option value="">— All Stops —</option>';
+  if(curC){DB.routes.filter(r=>r.cId===curC).forEach(r=>rs.appendChild(new Option(r.name,r.id)));drawCity(curC)}
+  else{clrLayers();if(map)map.setView([11.35,77.9],9)}
+  refreshMarkers();refreshBusCards();
+}
+function onRoute(){
+  curR=document.getElementById('sel-route').value;
+  const ss=document.getElementById('sel-stop');ss.innerHTML='<option value="">— All Stops —</option>';
+  if(curR){stopsFor(curR).forEach(s=>ss.appendChild(new Option(s.name,s.id)));drawRoute(curR)}
+  else if(curC)drawCity(curC);
+  refreshMarkers();refreshBusCards();
+}
+function onStop(){
+  const sid=document.getElementById('sel-stop').value;
+  if(sid&&map){const s=DB.stops.find(x=>x.id===sid);if(s)map.setView([s.lat,s.lng],16,{animate:true})}
+}
+function refreshBusCards(){
+  const buses=curR?DB.buses.filter(b=>b.rId===curR):curC?DB.buses.filter(b=>b.cId===curC):DB.buses.slice(0,24);
+  const el=document.getElementById('bus-cards');
+  const cnt=document.getElementById('bcnt');
+  if(cnt)cnt.textContent=buses.length;
+  if(!el)return;
+  el.innerHTML=buses.map(b=>{
+    const ns=nextStop(b).split(' ').slice(0,2).join(' ');
+    return`<div class="bcard ${b.status.toLowerCase()}" onclick="focusBus('${b.id}')">
+      <div class="bc-top"><div class="bc-plate">${b.plate}</div><div class="bc-tag ${b.status.toLowerCase()}">${b.status}</div></div>
+      <div class="bc-meta">
+        <div><div class="bm-v">${b.status==='Moving'?b.spd:0}</div><div class="bm-l">km/h</div></div>
+        <div><div class="bm-v" style="font-size:.69rem">${ns}</div><div class="bm-l">next stop</div></div>
+        <div><div class="bm-v"><span class="crowd-pill c${b.crowd}">${b.crowd}</span></div><div class="bm-l">crowd</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function focusBus(id){
+  const b=DB.buses.find(x=>x.id===id);if(!b||!map)return;
+  map.setView([b.lat,b.lng],15,{animate:true,duration:.7});
+  const m=bMkrs[id];if(m)setTimeout(()=>m.openPopup(),400);
+}
+
+/* ══════════════════════════════════════
+   PAGE ROUTING
+══════════════════════════════════════ */
+function showPg(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id==='pg-track'){
+    setTimeout(()=>{initMap();populateCityDrop();refreshMarkers();refreshBusCards();refreshMini();startSim()},80);
+  }
+  if(id==='pg-dash'){startSim();buildDash()}
+  if(id==='pg-home'||id==='pg-admin-login'){
+    const el=document.getElementById(id);if(el)el.scrollTop=0;
+  }
+}
+function gotoTrack(){showPg('pg-track')}
+function quickTrack(city){
+  showPg('pg-track');
+  setTimeout(()=>{
+    const sel=document.getElementById('sel-city');
+    const c=DB.cities.find(x=>x.name===city);
+    if(c&&sel){sel.value=c.id;onCity()}
+  },200);
+}
+
+/* ══════════════════════════════════════
+   LOGIN
+══════════════════════════════════════ */
+function doLogin(){
+  const u=document.getElementById('inp-u').value.trim();
+  const p=document.getElementById('inp-p').value.trim();
+  const err=document.getElementById('lerr');
+  const btn=document.getElementById('lbtn');
+  const txt=document.getElementById('lbtn-txt');
+  if(u==='admin'&&p==='admin123'){
+    err.style.display='none';
+    if(txt)txt.textContent='Signing in…';
+    btn.style.opacity='.7';btn.style.pointerEvents='none';
+    setTimeout(()=>{
+      btn.style.opacity='';btn.style.pointerEvents='';
+      if(txt)txt.textContent='Sign In';
+      showPg('pg-dash');
+    },600);
+  }else{
+    err.style.display='block';
+    err.style.animation='none';
+    requestAnimationFrame(()=>{err.style.animation=''});
+  }
+}
+function togglePwd(eye){
+  const inp=document.getElementById('inp-p');
+  if(!inp)return;
+  inp.type=inp.type==='password'?'text':'password';
+  eye.textContent=inp.type==='password'?'👁️':'🙈';
+}
+function doLogout(){showPg('pg-admin-login')}
+
+/* Ripple on login button */
+document.addEventListener('click',e=>{
+  const btn=e.target.closest('.lbtn');if(!btn)return;
+  const r=btn.querySelector('.lbtn-ripple');if(!r)return;
+  const rect=btn.getBoundingClientRect();
+  const sz=Math.max(btn.offsetWidth,btn.offsetHeight)*1.4;
+  r.style.cssText=`width:${sz}px;height:${sz}px;left:${e.clientX-rect.left-sz/2}px;top:${e.clientY-rect.top-sz/2}px;animation:rippleGo .5s ease forwards;border-radius:50%;position:absolute;background:rgba(255,255,255,.22);transform:scale(0)`;
+  setTimeout(()=>{r.style.animation='none';r.style.transform='scale(0)'},520);
+});
+
+/* ══════════════════════════════════════
+   DASHBOARD
+══════════════════════════════════════ */
+let chts={};
+function buildDash(){refreshDashLive();buildCharts();buildHeatmap();buildGauge();buildTables();popDrops()}
+
+function refreshDashLive(){
+  const mv=DB.buses.filter(b=>b.status==='Moving');
+  const st=DB.buses.filter(b=>b.status==='Stopped');
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+  set('m-c',DB.cities.length);set('m-r',DB.routes.length);set('m-s',DB.stops.length);set('m-b',DB.buses.length);
+  set('m-a',mv.length);set('m-ap',Math.round(mv.length/(DB.buses.length||1)*100)+'% of fleet');
+  set('m-sp',mv.length?(mv.reduce((t,b)=>t+b.spd,0)/mv.length).toFixed(1):0);
+  set('i-m',mv.length);set('i-s',st.length);set('i-c',DB.buses.filter(b=>b.crowd==='High').length);
+  const pct=Math.round(mv.length/(DB.buses.length||1)*100);
+  set('gauge-lbl',pct+'%');
+  drawGauge(pct);
+}
+
+const ccfg={responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',titleColor:'#222',bodyColor:'#555',borderColor:'#eee',borderWidth:1,padding:10}},
+  scales:{x:{ticks:{color:'#ccc',font:{size:9,family:'Inter'}},grid:{color:'#f8f8f8'}},
+          y:{ticks:{color:'#ccc',font:{size:9,family:'Inter'}},grid:{color:'#f8f8f8'}}}};
+function dCht(id){const c=document.getElementById(id);if(c){const i=Chart.getChart(c);if(i)i.destroy()}}
+
+function buildCharts(){
+  /* 1 Buses per city */
+  dCht('ch-city');
+  chts.city=new Chart(document.getElementById('ch-city'),{type:'bar',
+    data:{labels:DB.cities.map(c=>c.name),datasets:[{data:DB.cities.map(c=>DB.buses.filter(b=>b.cId===c.id).length),
+    backgroundColor:DB.cities.map(c=>c.color+'44'),borderColor:DB.cities.map(c=>c.color),borderWidth:2,borderRadius:7}]},
+    options:{...ccfg}});
+
+  /* 2 Speed distribution */
+  dCht('ch-speed');
+  const spd=DB.buses.filter(b=>b.status==='Moving').map(b=>Math.floor(b.spd));
+  const bk={'<30':0,'30–35':0,'35+':0};
+  spd.forEach(s=>{if(s<30)bk['<30']++;else if(s<=35)bk['30–35']++;else bk['35+']++});
+  chts.speed=new Chart(document.getElementById('ch-speed'),{type:'doughnut',
+    data:{labels:Object.keys(bk),datasets:[{data:Object.values(bk),
+    backgroundColor:['#e2391b33','#2563eb33','#16a34a33'],borderColor:['#e2391b','#2563eb','#16a34a'],borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+    plugins:{legend:{display:true,position:'bottom',labels:{color:'#bbb',font:{size:10,family:'Inter'},boxWidth:10,padding:8}},
+    tooltip:{backgroundColor:'#fff',titleColor:'#222',bodyColor:'#555',borderColor:'#eee',borderWidth:1}}}});
+
+  /* 3 Idle vs Moving */
+  dCht('ch-idle');
+  const mv=DB.buses.filter(b=>b.status==='Moving').length;
+  const st2=DB.buses.filter(b=>b.status==='Stopped').length;
+  chts.idle=new Chart(document.getElementById('ch-idle'),{type:'pie',
+    data:{labels:['Moving','Idle'],datasets:[{data:[mv,st2],
+    backgroundColor:['#16a34a44','#d9770644'],borderColor:['#16a34a','#d97706'],borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:true,position:'bottom',labels:{color:'#bbb',font:{size:10,family:'Inter'},boxWidth:10,padding:8}},
+    tooltip:{backgroundColor:'#fff',titleColor:'#222',bodyColor:'#555',borderColor:'#eee',borderWidth:1}}}});
+
+  /* 4 Avg travel time – area */
+  dCht('ch-travel');
+  const rl=DB.routes.slice(0,8).map(r=>r.name.split('→')[0].trim());
+  chts.travel=new Chart(document.getElementById('ch-travel'),{type:'line',
+    data:{labels:rl,datasets:[{label:'min',data:[18,24,31,15,22,28,35,20],
+    borderColor:'#e2391b',backgroundColor:'rgba(226,57,27,.07)',fill:true,tension:.4,
+    pointBackgroundColor:'#e2391b',pointRadius:4,borderWidth:2}]},
+    options:{...ccfg,plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',titleColor:'#222',bodyColor:'#555',borderColor:'#eee',borderWidth:1,padding:10}}}});
+
+  /* 5 Delay reasons – stacked */
+  dCht('ch-delay');
+  chts.delay=new Chart(document.getElementById('ch-delay'),{type:'bar',
+    data:{labels:['Salem','Erode','Tiruppur','Namakkal'],datasets:[
+      {label:'Traffic',data:[12,8,15,6],backgroundColor:'#e2391b44',borderColor:'#e2391b',borderWidth:1,borderRadius:4},
+      {label:'Breakdown',data:[3,5,2,4],backgroundColor:'#d9770644',borderColor:'#d97706',borderWidth:1,borderRadius:4},
+      {label:'Passenger',data:[7,6,9,5],backgroundColor:'#2563eb44',borderColor:'#2563eb',borderWidth:1,borderRadius:4},
+      {label:'Weather',data:[2,3,1,2],backgroundColor:'#7c3aed44',borderColor:'#7c3aed',borderWidth:1,borderRadius:4},
+    ]},
+    options:{...ccfg,
+    scales:{x:{stacked:true,ticks:{color:'#ccc',font:{size:9,family:'Inter'}},grid:{color:'#f8f8f8'}},
+            y:{stacked:true,ticks:{color:'#ccc',font:{size:9,family:'Inter'}},grid:{color:'#f8f8f8'}}},
+    plugins:{legend:{display:true,position:'bottom',labels:{color:'#aaa',font:{size:9,family:'Inter'},boxWidth:9,padding:7}},
+    tooltip:{backgroundColor:'#fff',titleColor:'#222',bodyColor:'#555',borderColor:'#eee',borderWidth:1,mode:'index',intersect:false}}}});
+
+  /* 6 Passenger load */
+  dCht('ch-load');
+  const ldData=[85,72,91,63,88,55,79,68];
+  chts.load=new Chart(document.getElementById('ch-load'),{type:'bar',
+    data:{labels:['Railway','Bus Stand','Shevapet','Erode Jn','Tiruppur','Namakkal','Bhavani','Avinashi'],
+    datasets:[{data:ldData,backgroundColor:ldData.map(v=>v>80?'#e2391b33':v>65?'#d9770633':'#16a34a33'),
+    borderColor:ldData.map(v=>v>80?'#e2391b':v>65?'#d97706':'#16a34a'),borderWidth:2,borderRadius:5}]},
+    options:{...ccfg,plugins:{legend:{display:false},
+    tooltip:{backgroundColor:'#fff',titleColor:'#222',bodyColor:'#555',borderColor:'#eee',borderWidth:1,
+    callbacks:{label:c=>c.parsed.y+' passengers'}}}}});
+
+  /* 7 Bus frequency */
+  dCht('ch-freq');
+  chts.freq=new Chart(document.getElementById('ch-freq'),{type:'bar',
+    data:{labels:['Salem','Erode','Tiruppur','Namakkal'],datasets:[
+      {label:'Morning 6–10',data:[18,14,16,10],backgroundColor:'#fbbf2444',borderColor:'#fbbf24',borderWidth:1.5,borderRadius:4},
+      {label:'Evening 16–20',data:[22,17,20,13],backgroundColor:'#e2391b44',borderColor:'#e2391b',borderWidth:1.5,borderRadius:4},
+      {label:'Night 20–24',data:[8,6,7,4],backgroundColor:'#2563eb44',borderColor:'#2563eb',borderWidth:1.5,borderRadius:4},
+    ]},
+    options:{...ccfg,
+    plugins:{legend:{display:true,position:'bottom',labels:{color:'#aaa',font:{size:9,family:'Inter'},boxWidth:9,padding:7}},
+    tooltip:{backgroundColor:'#fff',titleColor:'#222',bodyColor:'#555',borderColor:'#eee',borderWidth:1,mode:'index',intersect:false}}}});
+}
+
+/* Gauge */
+function drawGauge(pct){
+  const c=document.getElementById('ch-gauge');if(!c)return;
+  const ctx=c.getContext('2d');
+  const W=c.width,H=c.height,cx=W/2,cy=H*.78,R=72;
+  ctx.clearRect(0,0,W,H);
+  ctx.beginPath();ctx.arc(cx,cy,R,Math.PI,2*Math.PI,false);
+  ctx.lineWidth=16;ctx.strokeStyle='#f0f0f0';ctx.lineCap='round';ctx.stroke();
+  if(pct>0){
+    const ang=Math.PI+(pct/100)*Math.PI;
+    const g=ctx.createLinearGradient(cx-R,cy,cx+R,cy);
+    g.addColorStop(0,'#16a34a');g.addColorStop(.5,'#fbbf24');g.addColorStop(1,'#e2391b');
+    ctx.beginPath();ctx.arc(cx,cy,R,Math.PI,ang,false);
+    ctx.lineWidth=16;ctx.strokeStyle=g;ctx.lineCap='round';ctx.stroke();
+  }
+  /* needle */
+  const na=Math.PI+(pct/100)*Math.PI;
+  ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+(R-8)*Math.cos(na),cy+(R-8)*Math.sin(na));
+  ctx.lineWidth=2.5;ctx.strokeStyle='#e2391b';ctx.lineCap='round';ctx.stroke();
+  ctx.beginPath();ctx.arc(cx,cy,5,0,2*Math.PI);ctx.fillStyle='#e2391b';ctx.fill();
+  /* labels */
+  ctx.fillStyle='#ccc';ctx.font='bold 8px Inter';ctx.textAlign='center';
+  ['0%','50%','100%'].forEach((lbl,i)=>{
+    const a=Math.PI+(i*.5)*Math.PI;
+    ctx.fillText(lbl,cx+(R+14)*Math.cos(a),cy+(R+14)*Math.sin(a)+3);
+  });
+}
+function buildGauge(){const pct=Math.round(DB.buses.filter(b=>b.status==='Moving').length/(DB.buses.length||1)*100);drawGauge(pct)}
+
+/* Heatmap */
+function buildHeatmap(){
+  const el=document.getElementById('heatmap-grid');if(!el)return;
+  const hrs=['6a','7a','8a','9a','10a','11a','12p','1p','2p','3p','4p','5p','6p','7p','8p','9p','10p'];
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const raw={Mon:[18,28,32,22,14,12,15,13,14,16,24,30,28,20,14,10,6],Tue:[16,26,30,20,13,11,14,12,13,15,22,28,26,18,12,9,5],Wed:[17,27,31,21,14,12,15,13,14,16,23,29,27,19,13,9,5],Thu:[18,28,32,22,14,12,16,14,15,17,24,30,28,20,14,10,6],Fri:[20,30,32,24,16,14,17,15,16,18,26,32,30,22,16,12,8],Sat:[12,18,20,18,16,15,16,15,15,16,18,20,22,20,16,14,10],Sun:[8,12,14,13,12,12,13,12,12,13,14,16,18,16,12,10,8]};
+  const mx=32;
+  const col=v=>{const r=Math.min(255,Math.floor(v/mx*220));const g=Math.max(0,Math.floor(220-(v/mx*190)));return`rgb(${r},${g},50)`};
+  let h='<div class="hm-wrap"><table class="hm-tbl"><thead><tr><th class="hm-rlbl"></th>';
+  hrs.forEach(x=>h+=`<th>${x}</th>`);h+='</tr></thead><tbody>';
+  days.forEach(d=>{
+    h+=`<tr><td class="hm-rlbl">${d}</td>`;
+    raw[d].forEach(v=>h+=`<td style="background:${col(v)}" title="${v} buses">${v}</td>`);
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';el.innerHTML=h;
+}
+
+/* Tables */
+function buildTables(){rCt();rRt();rSt();rBt()}
+function rCt(){document.getElementById('tb-c').innerHTML=DB.cities.map(c=>`<tr><td style="font-weight:700;color:#222">${c.name}</td><td>${c.lat.toFixed(4)}</td><td>${c.lng.toFixed(4)}</td><td>${DB.routes.filter(r=>r.cId===c.id).length}</td><td>${DB.buses.filter(b=>b.cId===c.id).length}</td><td><button class="btndel" onclick="delCity('${c.id}')">Remove</button></td></tr>`).join('')}
+function rRt(){document.getElementById('tb-r').innerHTML=DB.routes.map(r=>{const c=DB.cities.find(x=>x.id===r.cId);return`<tr><td style="color:#222;font-size:.77rem">${r.name}</td><td>${c?c.name:''}</td><td>${DB.stops.filter(s=>s.rId===r.id).length}</td><td>${DB.buses.filter(b=>b.rId===r.id).length}</td><td><button class="btndel" onclick="delRoute('${r.id}')">Remove</button></td></tr>`}).join('')}
+function rSt(){document.getElementById('tb-s').innerHTML=DB.stops.map(s=>{const r=DB.routes.find(x=>x.id===s.rId);const c=r?DB.cities.find(x=>x.id===r.cId):null;return`<tr><td style="color:#222">${s.name}</td><td style="font-size:.73rem">${r?r.name.split('→')[0].trim()+'→…':''}</td><td>${c?c.name:''}</td><td>${s.lat.toFixed(4)}</td><td>${s.lng.toFixed(4)}</td><td><button class="btndel" onclick="delStop('${s.id}')">Remove</button></td></tr>`}).join('')}
+function rBt(){const cm={Low:'#16a34a',Medium:'#d97706',High:'#e11d48'};document.getElementById('tb-b').innerHTML=DB.buses.map(b=>{const r=DB.routes.find(x=>x.id===b.rId);const c=DB.cities.find(x=>x.id===b.cId);return`<tr><td style="font-weight:700;color:#222">${b.plate}</td><td style="font-size:.73rem">${r?r.name.split('→')[0].trim()+'→…':''}</td><td>${c?c.name:''}</td><td style="color:${b.status==='Moving'?'#16a34a':'#d97706'};font-weight:600">${b.status}</td><td>${b.status==='Moving'?b.spd:0}</td><td style="color:${cm[b.crowd]};font-weight:700">${b.crowd}</td><td><button class="btndel" onclick="delBus('${b.id}')">Remove</button></td></tr>`}).join('')}
+function popDrops(){
+  document.getElementById('ar-c').innerHTML=DB.cities.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  document.getElementById('as-r').innerHTML=DB.routes.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  document.getElementById('ab-r').innerHTML=DB.routes.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+}
+
+/* CRUD */
+let _uid=9000;function uid(){return'u'+(++_uid)}
+function addCity(){
+  const n=document.getElementById('ac-n').value.trim();
+  const lat=parseFloat(document.getElementById('ac-lat').value);
+  const lng=parseFloat(document.getElementById('ac-lng').value);
+  if(!n||isNaN(lat)||isNaN(lng)){toast('Fill all city fields','err');return}
+  const cols=['#e2391b','#2563eb','#16a34a','#d97706','#7c3aed','#0891b2'];
+  DB.cities.push({id:uid(),name:n,lat,lng,color:cols[DB.cities.length%cols.length]});
+  ['ac-n','ac-lat','ac-lng'].forEach(id=>document.getElementById(id).value='');
+  buildTables();refreshDashLive();popDrops();toast(`"${n}" added`,'ok');
+}
+function delCity(id){
+  const c=DB.cities.find(x=>x.id===id);if(!c)return;
+  const rids=DB.routes.filter(r=>r.cId===id).map(r=>r.id);
+  DB.cities=DB.cities.filter(x=>x.id!==id);DB.routes=DB.routes.filter(r=>r.cId!==id);
+  DB.stops=DB.stops.filter(s=>!rids.includes(s.rId));DB.buses=DB.buses.filter(b=>b.cId!==id);
+  buildTables();refreshDashLive();toast(`"${c.name}" removed`,'inf');
+}
+function addRoute(){
+  const cId=document.getElementById('ar-c').value;
+  const n=document.getElementById('ar-n').value.trim();
+  if(!n){toast('Enter route name','err');return}
+  DB.routes.push({id:uid(),cId,name:n});
+  document.getElementById('ar-n').value='';
+  buildTables();refreshDashLive();popDrops();toast('Route added','ok');
+}
+function delRoute(id){
+  DB.routes=DB.routes.filter(x=>x.id!==id);DB.stops=DB.stops.filter(s=>s.rId!==id);DB.buses=DB.buses.filter(b=>b.rId!==id);
+  buildTables();refreshDashLive();toast('Route removed','inf');
+}
+function addStop(){
+  const rId=document.getElementById('as-r').value;
+  const n=document.getElementById('as-n').value.trim();
+  const lat=parseFloat(document.getElementById('as-lat').value);
+  const lng=parseFloat(document.getElementById('as-lng').value);
+  if(!n||isNaN(lat)||isNaN(lng)){toast('Fill all stop fields','err');return}
+  DB.stops.push({id:uid(),rId,name:n,lat,lng,o:DB.stops.filter(s=>s.rId===rId).length});
+  ['as-n','as-lat','as-lng'].forEach(id=>document.getElementById(id).value='');
+  buildTables();refreshDashLive();toast(`"${n}" added`,'ok');
+}
+function delStop(id){DB.stops=DB.stops.filter(x=>x.id!==id);buildTables();refreshDashLive();toast('Stop removed','inf')}
+function addBus(){
+  const rId=document.getElementById('ab-r').value;
+  const plate=document.getElementById('ab-id').value.trim();
+  if(!plate){toast('Enter bus plate','err');return}
+  const route=DB.routes.find(r=>r.id===rId);if(!route)return;
+  const stops=stopsFor(rId);if(!stops.length){toast('Add stops to this route first','err');return}
+  DB.buses.push({id:uid(),plate,rId,cId:route.cId,si:0,prog:0,spd:+(25+Math.random()*15).toFixed(1),crowd:'Low',status:'Moving',stT:0,lat:stops[0].lat,lng:stops[0].lng});
+  document.getElementById('ab-id').value='';
+  buildTables();refreshDashLive();toast(`"${plate}" added`,'ok');
+}
+function delBus(id){
+  DB.buses=DB.buses.filter(x=>x.id!==id);
+  if(bMkrs[id]){bMkrs[id].remove();delete bMkrs[id]}
+  buildTables();refreshDashLive();toast('Bus removed','inf');
+}
+function swTab(name,btn){
+  document.querySelectorAll('.mbtn').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.mpanel').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on');document.getElementById('tp-'+name).classList.add('on');
+}
+
+/* Toast */
+let _tt=null;
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast '+type+' show';
+  if(_tt)clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+/* ══════════════════════════════════════
+   FAQ
+══════════════════════════════════════ */
+function toggleFaq(qEl){
+  const a=qEl.nextElementSibling;const ch=qEl.querySelector('.faq-chev');
+  const isOpen=a.classList.contains('open');
+  qEl.closest('.faq-list').querySelectorAll('.faq-a').forEach(x=>x.classList.remove('open'));
+  qEl.closest('.faq-list').querySelectorAll('.faq-chev').forEach(x=>x.classList.remove('open'));
+  if(!isOpen){a.classList.add('open');ch.classList.add('open')}
+}
+function faqTab(name,tab){
+  document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('on'));
+  tab.classList.add('on');
+  ['general','tracking','cities'].forEach(n=>{
+    const el=document.getElementById('faq-'+n);
+    if(el)el.style.display=n===name?'flex':'none';
+  });
+  const el=document.getElementById('faq-'+name);
+  if(el)el.style.flexDirection='column';
+}
+
+/* ══════════════════════════════════════
+   HELP MODAL
+══════════════════════════════════════ */
+function openHelp(){document.getElementById('help-modal').classList.add('open')}
+function closeHelp(){document.getElementById('help-modal').classList.remove('open')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeHelp();closeLangMenu()}});
+
+/* ══════════════════════════════════════
+   LANGUAGE SYSTEM
+══════════════════════════════════════ */
+const LANGS={
+  en:{flag:'🌐',lbl:'EN',help:'Help',adminLogin:'Admin Login',heroBadge:'Live Tracking Active',heroTitle:'Real-Time Bus Tracking',fromCity:'FROM CITY',routeDest:'ROUTE / DESTINATION',routePh:'Enter route or destination',trackDate:'TRACK DATE',todayLabel:'Today',trackNow:'🔍 Track Buses Now',quickTitle:'🎯 Quick Track',quickSub:'Popular cities & routes',viewAll:'View All →',whyTitle:'Why Choose TrackMyBus?',whySub:'Built for commuters in small cities',f1t:'Live Bus Positions',f1d:'Every second updates.',f2t:'Accurate ETA',f2d:'Precise arrival estimates.',f3t:'Crowd Levels',f3d:'Low, Medium or High crowd.',f4t:'Interactive Map',f4d:'See every bus moving live.',f5t:'Multi-City',f5d:'Salem, Erode, Tiruppur, Namakkal.',f6t:'Stop Tracking',f6d:'Filter to any stop.',f7t:'Mobile Ready',f7d:'Works on any device.',f8t:'Admin Panel',f8d:'Full fleet management.',helpTitle:'❓ Help & Guide',h1t:'Select Your City',h1d:'Choose Salem, Erode, Tiruppur or Namakkal.',h2t:'Pick a Route',h2d:'Filter by route to see buses on that path.',h3t:'Click a Bus Marker',h3d:'View live speed, ETA, crowd and next stop.',h4t:'Filter by Stop',h4d:'Select a stop to zoom and see approaching buses.',contactUs:'📞 Contact Support',supportHours:'Mon–Sat, 8am–8pm',liveTracker:'Live Tracker',filterHint:'Filter by city, route or stop',cityLbl:'City',routeLbl:'Route',stopLbl:'Stop',activeBuses:'Active Buses'},
+  ta:{flag:'🇮🇳',lbl:'த',help:'உதவி',adminLogin:'நிர்வாக உள்நுழைவு',heroBadge:'நேரடி கண்காணிப்பு',heroTitle:'நேரடி பேருந்து கண்காணிப்பு',fromCity:'நகரிலிருந்து',routeDest:'வழி / இலக்கு',routePh:'வழி உள்ளிடவும்',trackDate:'தேதி',todayLabel:'இன்று',trackNow:'🔍 பேருந்து கண்காணி',quickTitle:'🎯 விரைவு கண்காணிப்பு',quickSub:'பிரபல நகரங்கள்',viewAll:'அனைத்தும் →',whyTitle:'TrackMyBus ஏன் தேர்வு செய்ய?',whySub:'சிறு நகர பயணிகளுக்காக',f1t:'நேரடி இட நிலை',f1d:'ஒவ்வொரு நொடியும் புதுப்பிக்கப்படும்.',f2t:'துல்லியமான ETA',f2d:'சரியான வருகை மதிப்பீடு.',f3t:'கூட்ட அளவுகள்',f3d:'குறைவு, நடுத்தரம் அல்லது அதிகம்.',f4t:'ஊடாடும் வரைபடம்',f4d:'பேருந்துகள் நகர்வை காண்க.',f5t:'பல நகர ஆதரவு',f5d:'சேலம், ஈரோடு, திருப்பூர், நாமக்கல்.',f6t:'நிறுத்தம் கண்காணிப்பு',f6d:'நிறுத்தத்தில் வடிகட்டவும்.',f7t:'மொபைல் நட்பு',f7d:'எந்த சாதனத்திலும்.',f8t:'நிர்வாக பலகை',f8d:'முழு வாகன மேலாண்மை.',helpTitle:'❓ உதவி & வழிகாட்டி',h1t:'நகரை தேர்ந்தெடுக்கவும்',h1d:'சேலம், ஈரோடு, திருப்பூர் அல்லது நாமக்கல்.',h2t:'வழியை தேர்ந்தெடுக்கவும்',h2d:'வழி ஃபில்டர் செய்து பேருந்துகளை பார்க்கவும்.',h3t:'பேருந்தை கிளிக் செய்யவும்',h3d:'வேகம், ETA, கூட்டம் தெரிந்துகொள்ளவும்.',h4t:'நிறுத்தத்தால் வடிகட்டவும்',h4d:'நிறுத்தம் தேர்ந்து அணுகும் பேருந்துகளை காண்க.',contactUs:'📞 ஆதரவை தொடர்புகொள்ளவும்',supportHours:'திங்கள்–சனி, காலை 8–இரவு 8',liveTracker:'நேரடி கண்காணிப்பு',filterHint:'நகரம், வழி அல்லது நிறுத்தம்',cityLbl:'நகரம்',routeLbl:'வழி',stopLbl:'நிறுத்தம்',activeBuses:'செயலில் பேருந்துகள்'},
+  hi:{flag:'🇮🇳',lbl:'हि',help:'सहायता',adminLogin:'एडमिन लॉगिन',heroBadge:'लाइव ट्रैकिंग सक्रिय',heroTitle:'रियल-टाइम बस ट्रैकिंग',fromCity:'शहर से',routeDest:'मार्ग / गंतव्य',routePh:'मार्ग दर्ज करें',trackDate:'तारीख',todayLabel:'आज',trackNow:'🔍 बसें ट्रैक करें',quickTitle:'🎯 त्वरित ट्रैकिंग',quickSub:'लोकप्रिय शहर',viewAll:'सब देखें →',whyTitle:'TrackMyBus क्यों चुनें?',whySub:'छोटे शहरों के यात्रियों के लिए',f1t:'लाइव बस पोजीशन',f1d:'हर सेकंड अपडेट।',f2t:'सटीक ETA',f2d:'हर स्टॉप पर अनुमान।',f3t:'भीड़ स्तर',f3d:'कम, मध्यम या अधिक।',f4t:'इंटरैक्टिव मैप',f4d:'बसों को लाइव देखें।',f5t:'बहु-शहर',f5d:'सेलम, इरोड, तिरुपुर, नामक्कल।',f6t:'स्टॉप ट्रैकिंग',f6d:'किसी स्टॉप पर फ़िल्टर करें।',f7t:'मोबाइल फ्रेंडली',f7d:'किसी भी डिवाइस पर।',f8t:'एडमिन पैनल',f8d:'पूर्ण बेड़ा प्रबंधन।',helpTitle:'❓ सहायता और मार्गदर्शिका',h1t:'अपना शहर चुनें',h1d:'सेलम, इरोड, तिरुपुर या नामक्कल।',h2t:'मार्ग चुनें',h2d:'मार्ग से फ़िल्टर करें।',h3t:'बस मार्कर पर क्लिक करें',h3d:'गति, ETA, भीड़ देखें।',h4t:'स्टॉप से फ़िल्टर करें',h4d:'स्टॉप चुनकर बसें देखें।',contactUs:'📞 सहायता से संपर्क करें',supportHours:'सोम–शनि, सुबह 8–रात 8',liveTracker:'लाइव ट्रैकर',filterHint:'शहर, मार्ग या स्टॉप',cityLbl:'शहर',routeLbl:'मार्ग',stopLbl:'स्टॉप',activeBuses:'सक्रिय बसें'},
+  te:{flag:'🇮🇳',lbl:'తె',help:'సహాయం',adminLogin:'అడ్మిన్ లాగిన్',heroBadge:'లైవ్ ట్రాకింగ్ సక్రియం',heroTitle:'రియల్-టైమ్ బస్ ట్రాకింగ్',fromCity:'నగరం నుండి',routeDest:'మార్గం / గమ్యం',routePh:'మార్గం నమోదు చేయండి',trackDate:'తేదీ',todayLabel:'నేడు',trackNow:'🔍 బస్సులు ట్రాక్ చేయండి',quickTitle:'🎯 త్వరిత ట్రాకింగ్',quickSub:'ప్రముఖ నగరాలు',viewAll:'అన్నీ చూడండి →',whyTitle:'TrackMyBus ఎందుకు?',whySub:'చిన్న నగర ప్రయాణికుల కోసం',f1t:'లైవ్ బస్ స్థానాలు',f1d:'ప్రతి సెకను అప్‌డేట్.',f2t:'ఖచ్చితమైన ETA',f2d:'ప్రతి స్టాప్‌కు అంచనా.',f3t:'జనసాంద్రత',f3d:'తక్కువ, మధ్యమ లేదా అధిక.',f4t:'ఇంటరాక్టివ్ మ్యాప్',f4d:'బస్సులు కదలడం చూడండి.',f5t:'బహుళ-నగర',f5d:'సేలం, ఎరోడ్, తిరుప్పూర్, నామక్కల్.',f6t:'స్టాప్ ట్రాకింగ్',f6d:'స్టాప్ ద్వారా ఫిల్టర్.',f7t:'మొబైల్ ఫ్రెండ్లీ',f7d:'ఏ పరికరంలోనైనా.',f8t:'అడ్మిన్ పానెల్',f8d:'పూర్తి నిర్వహణ.',helpTitle:'❓ సహాయం & మార్గదర్శకం',h1t:'నగరం ఎంచుకోండి',h1d:'సేలం, ఎరోడ్, తిరుప్పూర్ లేదా నామక్కల్.',h2t:'మార్గం ఎంచుకోండి',h2d:'మార్గం ద్వారా ఫిల్టర్.',h3t:'బస్ మార్కర్ క్లిక్ చేయండి',h3d:'వేగం, ETA, జనసాంద్రత చూడండి.',h4t:'స్టాప్ ఫిల్టర్',h4d:'స్టాప్ ఎంచుకుని బస్సులు చూడండి.',contactUs:'📞 మద్దతు సంప్రదించండి',supportHours:'సోమ–శని, ఉదయం 8–రాత్రి 8',liveTracker:'లైవ్ ట్రాకర్',filterHint:'నగరం, మార్గం లేదా స్టాప్',cityLbl:'నగరం',routeLbl:'మార్గం',stopLbl:'స్టాప్',activeBuses:'చురుకైన బస్సులు'},
+  kn:{flag:'🇮🇳',lbl:'ಕ',help:'ಸಹಾಯ',adminLogin:'ಅಡ್ಮಿನ್ ಲಾಗಿನ್',heroBadge:'ಲೈವ್ ಟ್ರ್ಯಾಕಿಂಗ್ ಸಕ್ರಿಯ',heroTitle:'ರಿಯಲ್-ಟೈಮ್ ಬಸ್ ಟ್ರ್ಯಾಕಿಂಗ್',fromCity:'ನಗರದಿಂದ',routeDest:'ಮಾರ್ಗ / ತಲುಪುವ',routePh:'ಮಾರ್ಗ ನಮೂದಿಸಿ',trackDate:'ದಿನಾಂಕ',todayLabel:'ಇಂದು',trackNow:'🔍 ಬಸ್ ಟ್ರ್ಯಾಕ್ ಮಾಡಿ',quickTitle:'🎯 ತ್ವರಿತ ಟ್ರ್ಯಾಕಿಂಗ್',quickSub:'ಜನಪ್ರಿಯ ನಗರಗಳು',viewAll:'ಎಲ್ಲಾ ನೋಡಿ →',whyTitle:'TrackMyBus ಏಕೆ?',whySub:'ಸಣ್ಣ ನಗರ ಪ್ರಯಾಣಿಕರಿಗಾಗಿ',f1t:'ಲೈವ್ ಬಸ್ ಸ್ಥಾನ',f1d:'ಪ್ರತಿ ಸೆಕೆಂಡ್ ನವೀಕರಣ.',f2t:'ನಿಖರ ETA',f2d:'ಪ್ರತಿ ನಿಲ್ದಾಣಕ್ಕೆ ಅಂದಾಜು.',f3t:'ಜನಸಂದಣಿ ಮಟ್ಟ',f3d:'ಕಡಿಮೆ, ಮಧ್ಯಮ ಅಥವಾ ಅಧಿಕ.',f4t:'ಸಂವಾದ ನಕ್ಷೆ',f4d:'ಬಸ್ ಚಲನೆ ನೋಡಿ.',f5t:'ಬಹು-ನಗರ',f5d:'ಸೇಲಂ, ಈರೋಡ್, ತಿರುಪ್ಪೂರ್, ನಾಮಕ್ಕಲ್.',f6t:'ನಿಲ್ದಾಣ ಟ್ರ್ಯಾಕಿಂಗ್',f6d:'ನಿಲ್ದಾಣ ಆರಿಸಿ ಫಿಲ್ಟರ್.',f7t:'ಮೊಬೈಲ್ ಸ್ನೇಹಿ',f7d:'ಯಾವ ಸಾಧನದಲ್ಲೂ.',f8t:'ಅಡ್ಮಿನ್ ಪ್ಯಾನೆಲ್',f8d:'ಸಂಪೂರ್ಣ ನಿರ್ವಹಣೆ.',helpTitle:'❓ ಸಹಾಯ & ಮಾರ್ಗದರ್ಶನ',h1t:'ನಗರ ಆರಿಸಿ',h1d:'ಸೇಲಂ, ಈರೋಡ್, ತಿರುಪ್ಪೂರ್ ಅಥವಾ ನಾಮಕ್ಕಲ್.',h2t:'ಮಾರ್ಗ ಆರಿಸಿ',h2d:'ಮಾರ್ಗ ಫಿಲ್ಟರ್.',h3t:'ಬಸ್ ಮಾರ್ಕರ್ ಕ್ಲಿಕ್',h3d:'ವೇಗ, ETA, ಜನಸಂದಣಿ ನೋಡಿ.',h4t:'ನಿಲ್ದಾಣ ಫಿಲ್ಟರ್',h4d:'ನಿಲ್ದಾಣ ಆರಿಸಿ ಬಸ್ ನೋಡಿ.',contactUs:'📞 ಬೆಂಬಲ ಸಂಪರ್ಕ',supportHours:'ಸೋಮ–ಶನಿ, ಬೆಳಿಗ್ಗೆ 8–ರಾತ್ರಿ 8',liveTracker:'ಲೈವ್ ಟ್ರ್ಯಾಕರ್',filterHint:'ನಗರ, ಮಾರ್ಗ ಅಥವಾ ನಿಲ್ದಾಣ',cityLbl:'ನಗರ',routeLbl:'ಮಾರ್ಗ',stopLbl:'ನಿಲ್ದಾಣ',activeBuses:'ಸಕ್ರಿಯ ಬಸ್‌ಗಳು'},
+  ml:{flag:'🇮🇳',lbl:'മ',help:'സഹായം',adminLogin:'അഡ്മിൻ ലോഗിൻ',heroBadge:'തത്സമയ ട്രാക്കിംഗ്',heroTitle:'തത്സമയ ബസ് ട്രാക്കിംഗ്',fromCity:'നഗരത്തിൽ നിന്ന്',routeDest:'റൂട്ട് / ലക്ഷ്യം',routePh:'റൂട്ട് നൽകുക',trackDate:'തീയതി',todayLabel:'ഇന്ന്',trackNow:'🔍 ബസ് ട്രാക്ക് ചെയ്യൂ',quickTitle:'🎯 ദ്രുത ട്രാക്കിംഗ്',quickSub:'ജനപ്രിയ നഗരങ്ങൾ',viewAll:'എല്ലാം കാണൂ →',whyTitle:'TrackMyBus എന്തുകൊണ്ട്?',whySub:'ചെറു നഗര യാത്രക്കാർക്ക്',f1t:'തത്സമയ ബസ് സ്ഥാനം',f1d:'ഓരോ സെക്കൻഡും അപ്‌ഡേറ്റ്.',f2t:'കൃത്യ ETA',f2d:'ഓരോ സ്റ്റോപ്പിനും.',f3t:'തിരക്ക് നില',f3d:'കുറഞ്ഞ, ഇടത്തരം, അധിക.',f4t:'ഇന്ററാക്ടീവ് മാപ്പ്',f4d:'ബസ് ചലനം കാണൂ.',f5t:'ബഹുനഗര',f5d:'സേലം, ഈറോഡ്, തിരുപ്പൂർ, നാമക്കൽ.',f6t:'സ്റ്റോപ്പ് ട്രാക്കിംഗ്',f6d:'സ്റ്റോപ്പ് ഫിൽറ്റർ.',f7t:'മൊബൈൽ ഫ്രണ്ട്ലി',f7d:'ഏത് ഉപകരണത്തിലും.',f8t:'അഡ്മിൻ പാനൽ',f8d:'പൂർണ്ണ നിയന്ത്രണം.',helpTitle:'❓ സഹായം & മാർഗ്ഗനിർദ്ദേശം',h1t:'നഗരം തിരഞ്ഞെടുക്കൂ',h1d:'സേലം, ഈറോഡ്, തിരുപ്പൂർ അല്ലെങ്കിൽ നാമക്കൽ.',h2t:'റൂട്ട് തിരഞ്ഞെടുക്കൂ',h2d:'റൂട്ട് ഫിൽറ്റർ ചെയ്യൂ.',h3t:'ബസ് ക്ലിക്ക് ചെയ്യൂ',h3d:'വേഗം, ETA, തിരക്ക് കാണൂ.',h4t:'സ്റ്റോപ്പ് ഫിൽറ്റർ',h4d:'സ്റ്റോപ്പ് ഫിൽറ്റർ ചെയ്ത് ബസ് കാണൂ.',contactUs:'📞 സപ്പോർട്ട്',supportHours:'തി–ശ, 8am–8pm',liveTracker:'ലൈവ് ട്രാക്കർ',filterHint:'നഗരം, റൂട്ട് അല്ലെങ്കിൽ സ്റ്റോപ്പ്',cityLbl:'നഗരം',routeLbl:'റൂട്ട്',stopLbl:'സ്റ്റോപ്പ്',activeBuses:'സജീവ ബസുകൾ'}
+};
+let curLang='en';
+function setLang(code){
+  if(!LANGS[code])return;
+  curLang=code;const L=LANGS[code];
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    el.classList.add('lang-fade');
+  });
+  setTimeout(()=>{
+    document.querySelectorAll('[data-i18n]').forEach(el=>{
+      const k=el.getAttribute('data-i18n');
+      if(L[k]!==undefined)el.textContent=L[k];
+      el.classList.remove('lang-fade');
+    });
+    const dp=document.getElementById('home-dest');if(dp)dp.placeholder=L.routePh||'';
+  },160);
+  document.getElementById('lang-flag').textContent=L.flag;
+  document.getElementById('lang-name').textContent=L.lbl;
+  document.querySelectorAll('.lang-opt').forEach(o=>{
+    const on=o.getAttribute('data-l')===code;
+    o.classList.toggle('active',on);
+    const ch=o.querySelector('.lang-chk');if(ch)ch.textContent=on?'✓':'';
+  });
+  closeLangMenu();
+  toast(`Language: ${document.querySelector(`[data-l="${code}"] span:nth-child(2)`)?.textContent||L.lbl}`,'ok');
+}
+function toggleLang(){
+  const m=document.getElementById('lang-menu');
+  const ch=document.getElementById('lang-chev');
+  const open=m.classList.contains('open');
+  if(open){m.classList.remove('open');ch.style.transform=''}
+  else{m.classList.add('open');ch.style.transform='rotate(180deg)'}
+}
+function closeLangMenu(){
+  const m=document.getElementById('lang-menu');const ch=document.getElementById('lang-chev');
+  if(m)m.classList.remove('open');if(ch)ch.style.transform='';
+}
+document.addEventListener('click',e=>{
+  const w=document.getElementById('lang-wrap');
+  if(w&&!w.contains(e.target))closeLangMenu();
+});
+
+/* ══════════════════════════════════════
+   MISC / INIT
+══════════════════════════════════════ */
+/* Ripple on login button */
+document.addEventListener('click',e=>{
+  const btn=e.target.closest('.lbtn');if(!btn)return;
+  const r=btn.querySelector('.lbtn-ripple');if(!r)return;
+  const rect=btn.getBoundingClientRect();
+  const sz=Math.max(btn.offsetWidth,btn.offsetHeight)*1.4;
+  r.style.cssText=`width:${sz}px;height:${sz}px;left:${e.clientX-rect.left-sz/2}px;top:${e.clientY-rect.top-sz/2}px;position:absolute;background:rgba(255,255,255,.22);border-radius:50%;transform:scale(0);animation:rippleGo .5s ease forwards`;
+  setTimeout(()=>{r.style.animation='none';r.style.transform='scale(0)'},520);
+});
+
+/* Road dashes */
+(function(){
+  const c=document.getElementById('road-dashes');if(!c)return;
+  for(let i=0;i<14;i++){const d=document.createElement('div');d.className='rd';d.style.animationDelay=(-i*0.15)+'s';c.appendChild(d)}
+})();
+
+/* Today date */
+(function(){
+  const now=new Date();
+  const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const el=document.getElementById('today-date');
+  if(el)el.textContent=`${now.getDate()} ${m[now.getMonth()]}, ${now.getFullYear()}`;
+})();
+
+/* rippleGo keyframe */
+const ks=document.createElement('style');ks.textContent='@keyframes rippleGo{to{transform:scale(4);opacity:0}}';document.head.appendChild(ks);
+
+startSim();
+</script>
+</body>
+</html>
